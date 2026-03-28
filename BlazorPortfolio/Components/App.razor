@@ -20,6 +20,22 @@
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        Blazor.start({
+            circuit: {
+                reconnectionOptions: {
+                    maxRetries: 5,
+                    retryIntervalMilliseconds: 3000
+                }
+            },
+            configureSignalR: (builder) => {
+                builder.withUrl("/_blazor", {
+                    transport: signalR.HttpTransportType.WebSockets,
+                    skipNegotiation: true
+                });
+            }
+        });
+    </script>
     <script src="js/cache.js"></script>
     <script src="js/animations.js"></script>
 </body>

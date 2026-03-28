@@ -30,6 +30,15 @@ builder.Services.AddDataProtection()
     .PersistKeysToDbContext<AppDbContext>()
     .SetApplicationName("BlazorPortfolio");
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+    options.IdleTimeout = TimeSpan.FromHours(8);
+});
+
 builder.Services.AddScoped<ContentService>();
 builder.Services.AddScoped<AdminAuthService>();
 builder.Services.AddScoped<CacheService>();
@@ -96,6 +105,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseWebSockets();
+app.UseSession();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
