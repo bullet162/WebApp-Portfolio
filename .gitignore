@@ -10,7 +10,7 @@ obj/
 
 ## Secrets
 BlazorPortfolio/appsettings.json
-BlazorPortfolio/appsettings.*.json
+BlazorPortfolio/appsettings.Development.json
 
 ## Kiro
 .kiro/
