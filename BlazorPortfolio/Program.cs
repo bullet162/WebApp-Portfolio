@@ -13,7 +13,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
-    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+    options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
 });
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
@@ -29,10 +29,14 @@ builder.Services.AddHostedService<KeepAliveService>();
 var app = builder.Build();
 
 // Trust the reverse proxy (Render) so antiforgery and HTTPS work correctly
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+};
+// Clear default loopback-only restrictions so Render's proxy is trusted
+forwardedOptions.KnownNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
 // Warn on missing required secrets
 var requiredSecrets = new[]
