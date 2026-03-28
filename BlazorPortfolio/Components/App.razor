@@ -5,6 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <ResourcePreloader />
     <link rel="stylesheet" href="css/portfolio.css" />
     <ImportMap />
@@ -13,10 +16,12 @@
 </head>
 
 <body>
+    <canvas id="night-sky" aria-hidden="true"></canvas>
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="js/cache.js"></script>
+    <script src="js/animations.js"></script>
 </body>
 
 </html>

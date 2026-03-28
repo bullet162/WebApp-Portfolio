@@ -1,0 +1,112 @@
+@page "/admin/security"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject AdminAuthService Auth
+@inject IDbContextFactory<AppDbContext> DbFactory
+
+<PageTitle>Security Settings</PageTitle>
+
+<div class="admin-section">
+    <h2>Security Settings</h2>
+
+    @if (!string.IsNullOrEmpty(successMsg))
+    {
+        <div class="alert-success">@successMsg</div>
+    }
+    @if (!string.IsNullOrEmpty(errorMsg))
+    {
+        <div class="alert-error">@errorMsg</div>
+    }
+
+    <EditForm Model="model" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+
+        <div class="form-group">
+            <label>Current Password</label>
+            <InputText @bind-Value="model.CurrentPassword" type="password" class="form-control" />
+            <ValidationMessage For="() => model.CurrentPassword" />
+        </div>
+
+        <hr />
+
+        <div class="form-group">
+            <label>New Username <span style="opacity:.5">(leave blank to keep)</span></label>
+            <InputText @bind-Value="model.NewUsername" class="form-control" />
+        </div>
+
+        <div class="form-group">
+            <label>New Email <span style="opacity:.5">(leave blank to keep)</span></label>
+            <InputText @bind-Value="model.NewEmail" type="email" class="form-control" />
+        </div>
+
+        <div class="form-group">
+            <label>New Password <span style="opacity:.5">(leave blank to keep)</span></label>
+            <InputText @bind-Value="model.NewPassword" type="password" class="form-control" />
+        </div>
+
+        <div class="form-group">
+            <label>Confirm New Password</label>
+            <InputText @bind-Value="model.ConfirmPassword" type="password" class="form-control" />
+        </div>
+
+        <button type="submit" class="btn-primary" disabled="@saving">
+            @(saving ? "Saving..." : "Save Changes")
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    ChangeCredentialsModel model = new();
+    string? successMsg;
+    string? errorMsg;
+    bool saving;
+
+    async Task Save()
+    {
+        saving = true;
+        successMsg = null;
+        errorMsg = null;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var user = await db.AdminUsers.FirstOrDefaultAsync();
+        if (user is null) { errorMsg = "No admin user found."; saving = false; return; }
+
+        if (!BCrypt.Net.BCrypt.Verify(model.CurrentPassword, user.PasswordHash))
+        {
+            errorMsg = "Current password is incorrect.";
+            saving = false;
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.NewPassword))
+        {
+            if (model.NewPassword != model.ConfirmPassword)
+            {
+                errorMsg = "New passwords do not match.";
+                saving = false;
+                return;
+            }
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.NewUsername))
+            user.Username = model.NewUsername.Trim();
+
+        if (!string.IsNullOrWhiteSpace(model.NewEmail))
+            user.Email = model.NewEmail.Trim();
+
+        await db.SaveChangesAsync();
+        successMsg = "Credentials updated successfully.";
+        model = new();
+        saving = false;
+    }
+
+    class ChangeCredentialsModel
+    {
+        [Required] public string CurrentPassword { get; set; } = string.Empty;
+        public string? NewUsername { get; set; }
+        public string? NewEmail { get; set; }
+        public string? NewPassword { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
+}

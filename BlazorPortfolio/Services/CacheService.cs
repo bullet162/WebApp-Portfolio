@@ -45,5 +45,10 @@ public class CacheService(IJSRuntime js)
         public const string Skills      = "portfolio_skills";
         public const string Projects    = "portfolio_projects";
         public const string Profile     = "portfolio_profile";
+        public const string GitHubProfile      = "gh_profile";
+        public const string GitHubPinned       = "gh_pinned";
+        public const string GitHubContributions = "gh_contributions";
+        public const string GitHubContribTotal  = "gh_contrib_total";
+        public const string GitHubAllRepos      = "gh_all_repos";
     }
 }

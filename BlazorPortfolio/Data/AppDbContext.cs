@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<HiringMessage> HiringMessages => Set<HiringMessage>();
     public DbSet<SiteProfile> SiteProfiles => Set<SiteProfile>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

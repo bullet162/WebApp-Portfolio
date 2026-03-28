@@ -1,19 +1,23 @@
+using BlazorPortfolio.Data;
+using Microsoft.EntityFrameworkCore;
+
 namespace BlazorPortfolio.Services;
 
 /// <summary>
-/// Simple in-memory admin session. Credentials are stored in appsettings.json.
+/// Admin session backed by DB credentials (hashed with BCrypt).
 /// </summary>
-public class AdminAuthService
+public class AdminAuthService(IDbContextFactory<AppDbContext> dbFactory)
 {
     private bool _isAuthenticated;
 
     public bool IsAuthenticated => _isAuthenticated;
 
-    public bool Login(string username, string password, IConfiguration config)
+    public async Task<bool> LoginAsync(string username, string password)
     {
-        var adminUser = config["Admin:Username"];
-        var adminPass = config["Admin:Password"];
-        _isAuthenticated = username == adminUser && password == adminPass;
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.AdminUsers.FirstOrDefaultAsync(u => u.Username == username);
+        if (user is null) return false;
+        _isAuthenticated = BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
         return _isAuthenticated;
     }
 

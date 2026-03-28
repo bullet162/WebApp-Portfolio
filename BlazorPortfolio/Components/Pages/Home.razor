@@ -2,25 +2,29 @@
 @rendermode InteractiveServer
 @inject ContentService Svc
 @inject CacheService Cache
+@inject GitHubService GitHub
 
-<PageTitle>Portfolio</PageTitle>
+<PageTitle>@(profile?.OwnerName ?? "Portfolio")</PageTitle>
 
-<!-- ── HERO ──────────────────────────────────────────────────────────────── -->
+<!-- HERO -->
 <section class="hero" id="about">
-    <div class="hero-bg-shapes">
-        <span class="shape s1"></span>
-        <span class="shape s2"></span>
-        <span class="shape s3"></span>
-    </div>
+    <div class="hero-bg"><div class="hero-grid-lines"></div></div>
     <div class="container hero-content">
         <div class="hero-text">
-            <p class="hero-eyebrow">@(profile?.Eyebrow ?? "👋 Welcome to my portfolio")</p>
-            <h1>Hi, I'm <span class="accent">@(profile?.OwnerName ?? "Your Name")</span></h1>
+            <p class="hero-eyebrow">@(profile?.Eyebrow ?? "Welcome to my portfolio")</p>
+            <h1>Hi, I'm <span class="hero-name">@(profile?.OwnerName ?? "Your Name")</span></h1>
             <p class="tagline">@(profile?.Tagline ?? "Full Stack Developer · .NET · Blazor · Cloud")</p>
             <p class="hero-bio">@(profile?.HeroBio ?? "")</p>
             <div class="hero-actions">
                 <a href="#contact" class="btn-primary">@(profile?.HeroCta ?? "Hire Me")</a>
                 <a href="#projects" class="btn-outline">@(profile?.HeroSecondaryCta ?? "See My Work")</a>
+                @if (!string.IsNullOrEmpty(profile?.ResumeUrl))
+                {
+                    <a href="@profile.ResumeUrl" target="_blank" class="btn-outline btn-resume">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 1.5a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5H3.75Zm5.75.56v2.19c0 .138.112.25.25.25h2.19L9.5 2.06ZM2 1.75C2 .784 2.784 0 3.75 0h5.086c.464 0 .909.184 1.237.513l3.414 3.414c.329.328.513.773.513 1.237v8.086A1.75 1.75 0 0 1 12.25 15h-8.5A1.75 1.75 0 0 1 2 13.25V1.75Z"/></svg>
+                        Resume
+                    </a>
+                }
             </div>
         </div>
         <div class="hero-avatar">
@@ -41,7 +45,7 @@
     </a>
 </section>
 
-<!-- ── EXPERIENCE ─────────────────────────────────────────────────────────── -->
+<!-- EXPERIENCE -->
 <section class="section" id="experience">
     <div class="container">
         <div class="section-header">
@@ -50,22 +54,17 @@
         </div>
         @if (experiences is null)
         {
-            <div class="skeleton-list">
-                <div class="skeleton"></div>
-                <div class="skeleton"></div>
-            </div>
+            <div class="skeleton-list"><div class="skeleton"></div><div class="skeleton"></div></div>
         }
         else
         {
             <div class="timeline">
                 @foreach (var exp in experiences)
                 {
-                    <div class="timeline-item">
+                    <div class="timeline-item anim-slide">
                         <div class="timeline-dot"></div>
                         <div class="timeline-card">
-                            <div class="timeline-meta">
-                                <span class="tl-period">@exp.Period</span>
-                            </div>
+                            <div class="timeline-meta"><span class="tl-period">@exp.Period</span></div>
                             <h3>@exp.Title</h3>
                             <p class="tl-company">@exp.Company</p>
                             <p class="tl-desc">@exp.Description</p>
@@ -77,41 +76,8 @@
     </div>
 </section>
 
-<!-- ── SKILLS ─────────────────────────────────────────────────────────────── -->
-<section class="section alt" id="skills">
-    <div class="container">
-        <div class="section-header">
-            <span class="section-tag">What I Know</span>
-            <h2>Skills</h2>
-        </div>
-        <div class="skills-grid">
-            @if (skills is not null)
-            {
-                @foreach (var group in skills.GroupBy(s => s.Category))
-                {
-                    <div class="skill-group">
-                        <h3 class="skill-category">@group.Key</h3>
-                        @foreach (var skill in group)
-                        {
-                            <div class="skill-item">
-                                <div class="skill-label">
-                                    <span>@skill.Name</span>
-                                    <span class="skill-pct">@skill.Proficiency%</span>
-                                </div>
-                                <div class="skill-bar">
-                                    <div class="skill-fill" style="width:@(skill.Proficiency)%"></div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            }
-        </div>
-    </div>
-</section>
-
-<!-- ── PROJECTS ───────────────────────────────────────────────────────────── -->
-<section class="section" id="projects">
+<!-- PROJECTS -->
+<section class="section alt" id="projects">
     <div class="container">
         <div class="section-header">
             <span class="section-tag">My Work</span>
@@ -120,9 +86,11 @@
         <div class="projects-grid">
             @if (projects is not null)
             {
+                int pi = 0;
                 @foreach (var proj in projects)
                 {
-                    <div class="project-card">
+                    var pd = $"d{(pi % 6) + 1}"; pi++;
+                    <div class="project-card anim-scale @pd">
                         <div class="project-card-top">
                             <span class="project-icon">🚀</span>
                             <div class="project-links">
@@ -151,7 +119,296 @@
     </div>
 </section>
 
-<!-- ── CONTACT ────────────────────────────────────────────────────────────── -->
+<!-- TECH CONSTELLATION (replaces Skills section) -->
+@if (techStack.Count > 0)
+{
+    <section class="section" id="skills">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">What I Know</span>
+                <h2>Tech Stack</h2>
+                <p>Skills and technologies — line brightness shows how closely related they are.</p>
+            </div>
+            <div class="constellation-legend">
+                <span class="cl-item @(selectedCategory == null ? "cl-active" : "")"
+                      @onclick="() => SelectCategory(null)">
+                    <span class="cl-dot" style="background:rgba(255,255,255,0.4)"></span>
+                    All
+                </span>
+                @foreach (var cat in techStack.Select(t => (t.Category, t.Color)).DistinctBy(x => x.Category))
+                {
+                    var c = cat;
+                    <span class="cl-item @(selectedCategory == c.Category ? "cl-active" : "")"
+                          @onclick="() => SelectCategory(c.Category)">
+                        <span class="cl-dot" style="background:@c.Color"></span>
+                        @c.Category
+                    </span>
+                }
+            </div>
+            @{
+                var visibleNodes = selectedCategory == null
+                    ? techStack
+                    : techStack.Where(t => t.Category == selectedCategory).ToList();
+                var visibleIndices = visibleNodes.Select(t => techStack.IndexOf(t)).ToHashSet();
+                var visibleEdges = selectedCategory == null
+                    ? techEdges.Select(e => new { e.A, e.B, e.Weight, Color = (string?)null })
+                    : techEdges
+                        .Where(e => visibleIndices.Contains(e.A) && visibleIndices.Contains(e.B))
+                        .Select(e => new { e.A, e.B, e.Weight, Color = techStack[e.A].Color });
+            }
+            <div class="constellation-canvas" id="constellation-canvas">
+                <canvas id="constellation-bg"
+                        data-edges="@System.Text.Json.JsonSerializer.Serialize(visibleEdges)"
+                        data-category="@(selectedCategory ?? "")">
+                </canvas>
+                <div class="constellation-nodes">
+                    @{ int ni = 0; }
+                    @foreach (var tech in techStack)
+                    {
+                        var delay = $"{ni * 0.045:F2}s"; ni++;
+                        bool hidden = selectedCategory != null && tech.Category != selectedCategory;
+                        <div class="constellation-node @(hidden ? "cn-hidden" : "")"
+                             style="left:@(tech.X)%;top:@(tech.Y)%;--size:@(tech.Size)px;--color:@tech.Color;animation-delay:@delay"
+                             title="@tech.Name · @tech.Category"
+                             data-index="@(techStack.IndexOf(tech))">
+                            <div class="cn-dot"></div>
+                            <span class="cn-label">@tech.Name</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+}
+
+<!-- GITHUB -->
+@if (!string.IsNullOrWhiteSpace(profile?.GitHubUsername))
+{
+    <section class="section alt" id="github">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Open Source</span>
+                <h2>GitHub</h2>
+            </div>
+
+            @if (ghProfile is not null)
+            {
+                <div class="gh-banner anim-slide">
+                    @if (!string.IsNullOrEmpty(ghProfile.AvatarUrl))
+                    {
+                        <img src="@ghProfile.AvatarUrl" alt="@ghProfile.Name" class="gh-banner-avatar" />
+                    }
+                    <div class="gh-banner-info">
+                        <div class="gh-banner-name">@ghProfile.Name</div>
+                        @if (!string.IsNullOrEmpty(ghProfile.Bio))
+                        {
+                            <div class="gh-banner-bio">@ghProfile.Bio</div>
+                        }
+                        <div class="gh-banner-stats">
+                            <span class="gh-stat-chip">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8Z"/></svg>
+                                @ghProfile.PublicRepos public repos
+                            </span>
+                            <span class="gh-stat-chip">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4 4 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z"/></svg>
+                                @ghProfile.Followers followers
+                            </span>
+                            @if (ghContribTotal > 0)
+                            {
+                                <span class="gh-stat-chip highlight">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>
+                                    @ghContribTotal contributions this year
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    <div class="gh-banner-actions">
+                        <a href="@("https://github.com/" + profile!.GitHubUsername)" target="_blank" class="gh-view-profile">
+                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+                            View on GitHub
+                        </a>
+                    </div>
+                </div>
+            }
+
+            <div class="gh-tabs">
+                <button class="gh-tab @(repoTab == "pinned" ? "active" : "")" @onclick='() => SetTab("pinned")'>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
+                    Pinned
+                </button>
+                <button class="gh-tab @(repoTab == "all" ? "active" : "")" @onclick='() => SetTab("all")'>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8Z"/></svg>
+                    All Public Repos
+                    @if (allRepos is not null) { <span class="gh-tab-count">@allRepos.Count</span> }
+                </button>
+            </div>
+
+            @{
+                var displayRepos = repoTab == "all" ? allRepos : pinnedRepos;
+                var isLoading    = repoTab == "all" ? allRepos is null : pinnedRepos is null;
+            }
+            @if (isLoading)
+            {
+                <div class="gh-repos-skeleton">
+                    @for (int i = 0; i < 6; i++) { <div class="skeleton gh-repo-skeleton"></div> }
+                </div>
+            }
+            else if (displayRepos is { Count: 0 })
+            {
+                <div class="gh-empty-state">
+                    <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="color:var(--text-muted)"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8Z"/></svg>
+                    <p>No public repositories found for <strong>@profile!.GitHubUsername</strong>.</p>
+                    <a href="@("https://github.com/" + profile!.GitHubUsername)" target="_blank" class="gh-view-profile" style="margin-top:.5rem">View on GitHub ↗</a>
+                </div>
+            }
+            else if (displayRepos is not null)
+            {
+                <div class="gh-repos-grid">
+                    @{ int ci = 0; }
+                    @foreach (var repo in displayRepos)
+                    {
+                        var cd = $"d{(ci % 6) + 1}"; ci++;
+                        <div class="gh-repo-card anim-scale @cd">
+                            <div class="gh-repo-header">
+                                <div class="gh-repo-name-row">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="gh-repo-icon"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8Z"/></svg>
+                                    <a href="@repo.Url" target="_blank" class="gh-repo-title">@repo.Name</a>
+                                </div>
+                                <div class="gh-repo-actions">
+                                    @if (!string.IsNullOrEmpty(repo.HomepageUrl))
+                                    {
+                                        <a href="@repo.HomepageUrl" target="_blank" class="gh-icon-btn" title="Live demo">
+                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"/></svg>
+                                        </a>
+                                    }
+                                    <a href="@repo.Url" target="_blank" class="gh-icon-btn" title="View on GitHub">
+                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+                                    </a>
+                                </div>
+                            </div>
+                            <p class="gh-repo-desc">@(string.IsNullOrEmpty(repo.Description) ? "No description." : repo.Description)</p>
+                            @if (repo.Topics.Count > 0)
+                            {
+                                <div class="gh-topics">
+                                    @foreach (var topic in repo.Topics.Take(4))
+                                    {
+                                        <span class="gh-topic">@topic</span>
+                                    }
+                                </div>
+                            }
+                            <div class="gh-repo-footer">
+                                @if (!string.IsNullOrEmpty(repo.PrimaryLanguage))
+                                {
+                                    <span class="gh-lang">
+                                        <span class="gh-lang-dot" style="background:@repo.LanguageColor"></span>
+                                        @repo.PrimaryLanguage
+                                    </span>
+                                }
+                                @if (repo.Stars > 0)
+                                {
+                                    <span class="gh-meta-item">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
+                                        @repo.Stars
+                                    </span>
+                                }
+                                @if (repo.Forks > 0)
+                                {
+                                    <span class="gh-meta-item">
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"/></svg>
+                                        @repo.Forks
+                                    </span>
+                                }
+                                @if (!string.IsNullOrEmpty(repo.UpdatedAt) && DateTime.TryParse(repo.UpdatedAt, out var updAt))
+                                {
+                                    <span class="gh-meta-item gh-updated">@TimeAgo(updAt)</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ghContribWeeks is { Count: > 0 })
+            {
+                <div class="gh-contrib-wrap">
+                    <div class="gh-contrib-top">
+                        <div>
+                            <div class="gh-contrib-title">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>
+                                @ghContribTotal contributions in the last year
+                            </div>
+                            <div class="gh-contrib-sub">Coding activity across all public repositories</div>
+                        </div>
+                        <div class="gh-streaks">
+                            @if (longestStreak > 0)
+                            {
+                                <div class="gh-streak">
+                                    <span class="gh-streak-val">@longestStreak</span>
+                                    <span class="gh-streak-label">🔥 Longest streak</span>
+                                </div>
+                            }
+                            @if (currentStreak > 0)
+                            {
+                                <div class="gh-streak">
+                                    <span class="gh-streak-val">@currentStreak</span>
+                                    <span class="gh-streak-label">⚡ Current streak</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="gh-graph-scroll">
+                        <div class="gh-graph-inner">
+                            <div class="gh-months" style="--week-count:@ghContribWeeks.Count">
+                                @foreach (var (label, col) in monthLabels)
+                                {
+                                    <span class="gh-month-lbl" style="grid-column:@col">@label</span>
+                                }
+                            </div>
+                            <div class="gh-graph-body">
+                                <div class="gh-day-lbls">
+                                    <span></span><span>Mon</span><span></span>
+                                    <span>Wed</span><span></span><span>Fri</span><span></span>
+                                </div>
+                                <div class="gh-weeks">
+                                    @foreach (var week in ghContribWeeks)
+                                    {
+                                        <div class="gh-week">
+                                            @for (int d = 0; d < 7; d++)
+                                            {
+                                                var day = week.Days.FirstOrDefault(x => x.DayOfWeek == d);
+                                                if (day is not null)
+                                                {
+                                                    <span class="gh-cell @(day.Count > 0 ? "has-contrib" : "gh-cell-zero")"
+                                                          style="background:@day.Color"
+                                                          title="@day.Date — @day.Count contribution@(day.Count == 1 ? "" : "s")"></span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="gh-cell gh-cell-empty"></span>
+                                                }
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="gh-legend">
+                        <span>Less</span>
+                        <span class="gh-cell" style="background:rgba(255,255,255,.04)"></span>
+                        <span class="gh-cell" style="background:#0e4429"></span>
+                        <span class="gh-cell" style="background:#006d32"></span>
+                        <span class="gh-cell" style="background:#26a641"></span>
+                        <span class="gh-cell" style="background:#39d353"></span>
+                        <span>More</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<!-- CONTACT -->
 <section class="section alt" id="contact">
     <div class="container">
         <div class="section-header">
@@ -199,20 +456,22 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Name</label>
-                                <InputText @bind-Value="hiringMsg.Name" class="form-control" placeholder="Your name" />
+                                <InputText @bind-Value="hiringMsg.Name" class="form-control" placeholder="Your name (optional)" />
                             </div>
                             <div class="form-group">
-                                <label>Email</label>
+                                <label>Email *</label>
                                 <InputText @bind-Value="hiringMsg.Email" class="form-control" placeholder="your@email.com" />
+                                <ValidationMessage For="() => hiringMsg.Email" />
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Subject</label>
+                            <label>Subject *</label>
                             <InputText @bind-Value="hiringMsg.Subject" class="form-control" placeholder="e.g. Full Stack Developer Opportunity" />
+                            <ValidationMessage For="() => hiringMsg.Subject" />
                         </div>
                         <div class="form-group">
                             <label>Message</label>
-                            <InputTextArea @bind-Value="hiringMsg.Message" class="form-control" rows="5" placeholder="Tell me about the opportunity..." />
+                            <InputTextArea @bind-Value="hiringMsg.Message" class="form-control" rows="5" placeholder="Tell me about the opportunity... (optional)" />
                         </div>
                         <button type="submit" class="btn-primary btn-full">Send Message →</button>
                     </EditForm>
@@ -237,46 +496,217 @@
     HiringMessage hiringMsg = new();
     bool messageSent;
 
+    GitHubProfile? ghProfile;
+    List<GitHubPinnedRepo>? pinnedRepos;
+    List<GitHubPinnedRepo>? allRepos;
+    List<GitHubContributionWeek>? ghContribWeeks;
+    int ghContribTotal;
+    int longestStreak;
+    int currentStreak;
+    List<(string Label, int Col)> monthLabels = [];
+    string repoTab = "pinned";
+    List<TechNode> techStack = [];
+    List<TechEdge> techEdges = [];
+    string? selectedCategory = null;
+
+    void SelectCategory(string? cat) { selectedCategory = cat; }
+
+    record TechNode(string Name, int RepoCount, double X, double Y, int Size, string Color, string Category);
+    record TechEdge(int A, int B, double Weight);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
         profile = await Cache.GetAsync<SiteProfile>(CacheService.Keys.Profile)
                   ?? await FetchAndCache(Svc.GetProfileAsync(), CacheService.Keys.Profile);
-
         experiences = await Cache.GetAsync<List<Experience>>(CacheService.Keys.Experiences)
                       ?? await FetchAndCache(Svc.GetExperiencesAsync(), CacheService.Keys.Experiences);
-
         skills = await Cache.GetAsync<List<Skill>>(CacheService.Keys.Skills)
                  ?? await FetchAndCache(Svc.GetSkillsAsync(), CacheService.Keys.Skills);
-
         projects = await Cache.GetAsync<List<Project>>(CacheService.Keys.Projects)
                    ?? await FetchAndCache(Svc.GetProjectsAsync(), CacheService.Keys.Projects);
 
+        BuildConstellation(); // build from skills immediately
         StateHasChanged();
+
+        if (!string.IsNullOrWhiteSpace(profile?.GitHubUsername))
+        {
+            var username = profile.GitHubUsername;
+            ghProfile = await Cache.GetAsync<GitHubProfile>(CacheService.Keys.GitHubProfile)
+                        ?? await FetchAndCache(GitHub.GetProfileAsync(username), CacheService.Keys.GitHubProfile);
+            StateHasChanged();
+
+            var pinnedTask = Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubPinned);
+            var allTask    = Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubAllRepos);
+            await Task.WhenAll(pinnedTask, allTask);
+
+            pinnedRepos = pinnedTask.Result ?? await FetchAndCache(GitHub.GetPinnedReposAsync(username), CacheService.Keys.GitHubPinned);
+            allRepos    = allTask.Result    ?? await FetchAndCache(GitHub.GetAllPublicReposAsync(username), CacheService.Keys.GitHubAllRepos);
+            pinnedRepos ??= [];
+            allRepos    ??= [];
+
+            BuildConstellation(); // rebuild with GitHub data merged in
+            StateHasChanged();
+
+            ghContribWeeks = await Cache.GetAsync<List<GitHubContributionWeek>>(CacheService.Keys.GitHubContributions);
+            ghContribTotal = await Cache.GetAsync<int>(CacheService.Keys.GitHubContribTotal);
+            if (ghContribWeeks is null)
+            {
+                var (weeks, total) = await GitHub.GetContributionsAsync(username);
+                ghContribWeeks = weeks; ghContribTotal = total;
+                await Cache.SetAsync(CacheService.Keys.GitHubContributions, weeks);
+                await Cache.SetAsync(CacheService.Keys.GitHubContribTotal, total);
+            }
+            if (ghContribWeeks is { Count: > 0 }) { ComputeStreaks(); BuildMonthLabels(); }
+            StateHasChanged();
+        }
+        else
+        {
+            pinnedRepos = [];
+            allRepos    = [];
+        }
     }
 
-    async Task<T> FetchAndCache<T>(Task<T> fetchTask, string key)
+    void SetTab(string tab) => repoTab = tab;
+
+    void BuildConstellation()
     {
-        var data = await fetchTask;
-        await Cache.SetAsync(key, data);
-        return data;
+        var skillNodes = (skills ?? []).Select(s => (
+            Name: s.Name, Count: Math.Max(1, s.Proficiency / 10),
+            Category: s.Category, Source: "skill")).ToList();
+
+        var repos = allRepos ?? pinnedRepos ?? [];
+        var ghLangs  = repos.Where(r => !string.IsNullOrEmpty(r.PrimaryLanguage))
+            .GroupBy(r => r.PrimaryLanguage)
+            .Select(g => (Name: g.Key, Count: g.Count() * 2, Category: "GitHub", Source: "gh"));
+        var ghTopics = repos.SelectMany(r => r.Topics).GroupBy(t => t)
+            .Select(g => (Name: g.Key, Count: g.Count(), Category: "GitHub", Source: "gh"));
+
+        var allEntries = skillNodes.Concat(ghLangs).Concat(ghTopics)
+            .GroupBy(x => x.Name.ToLowerInvariant())
+            .Select(g => {
+                var best = g.OrderByDescending(x => x.Source == "skill" ? 1 : 0).First();
+                return (best.Name, Count: g.Sum(x => x.Count), best.Category);
+            })
+            .OrderByDescending(x => x.Count).Take(28).ToList();
+
+        if (allEntries.Count == 0) return;
+
+        var catColors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Backend"] = "#00e5ff", ["Frontend"] = "#7c6fff", ["Fullstack"] = "#a29bfe",
+            ["Programming Language"] = "#00e5a0", ["Data Mining"] = "#ffd166",
+            ["Structure"] = "#fd79a8", ["DevOps"] = "#74b9ff", ["GitHub"] = "#58a6ff",
+        };
+        string GetColor(string cat) {
+            if (catColors.TryGetValue(cat, out var c)) return c;
+            var p = new[]{"#00e5ff","#7c6fff","#ff6b9d","#00e5a0","#ffd166","#a29bfe","#74b9ff","#fd79a8"};
+            return p[Math.Abs(cat.GetHashCode()) % p.Length];
+        }
+
+        int maxCount = allEntries.Max(x => x.Count);
+        var nodes = new List<TechNode>();
+        double ga = Math.PI * (3 - Math.Sqrt(5));
+        for (int i = 0; i < allEntries.Count; i++)
+        {
+            var (name, count, cat) = allEntries[i];
+            double r = 0.38 * Math.Sqrt((double)(i + 1) / allEntries.Count);
+            double t = i * ga;
+            double x = Math.Clamp(50 + r * Math.Cos(t) * 82, 4, 93);
+            double y = Math.Clamp(50 + r * Math.Sin(t) * 72, 6, 90);
+            int sz = (int)(8 + 16 * ((double)count / maxCount));
+            nodes.Add(new TechNode(name, count, Math.Round(x,1), Math.Round(y,1), sz, GetColor(cat), cat));
+        }
+        techStack = nodes;
+
+        double Rel(string a, string b) {
+            if (a == b) return 1.0;
+            var m = new Dictionary<(string,string), double>(new PairCmp())
+            {
+                [("Backend","Programming Language")]=0.9, [("Frontend","Programming Language")]=0.9,
+                [("Fullstack","Backend")]=0.85, [("Fullstack","Frontend")]=0.85,
+                [("Fullstack","Programming Language")]=0.8, [("Backend","GitHub")]=0.6,
+                [("Frontend","GitHub")]=0.6, [("Programming Language","GitHub")]=0.7,
+                [("Data Mining","Programming Language")]=0.6, [("Data Mining","Backend")]=0.5,
+                [("Structure","Backend")]=0.55, [("Structure","Fullstack")]=0.5,
+                [("DevOps","Backend")]=0.6, [("DevOps","GitHub")]=0.65,
+            };
+            return m.TryGetValue((a,b), out var w) ? w : 0.12;
+        }
+
+        var edges = new List<TechEdge>();
+        for (int i = 0; i < nodes.Count; i++)
+            for (int j = i+1; j < nodes.Count; j++) {
+                double w = Rel(nodes[i].Category, nodes[j].Category);
+                if (SharesKeyword(nodes[i].Name, nodes[j].Name)) w = Math.Min(1.0, w + 0.25);
+                if (w >= 0.12) edges.Add(new TechEdge(i, j, w));
+            }
+        techEdges = edges;
     }
 
-    async Task SendMessage()
-    {
+    static bool SharesKeyword(string a, string b) {
+        var stop = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {"the","and","or","of","a","an","in","for","to","with","by","on","at","is","as"};
+        var wa = a.Split(' ','.', '-','/').Where(w => w.Length > 2 && !stop.Contains(w)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var wb = b.Split(' ','.', '-','/').Where(w => w.Length > 2 && !stop.Contains(w)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return wa.Overlaps(wb);
+    }
+
+    class PairCmp : IEqualityComparer<(string,string)> {
+        public bool Equals((string,string) x, (string,string) y) =>
+            (x.Item1.Equals(y.Item1,StringComparison.OrdinalIgnoreCase) && x.Item2.Equals(y.Item2,StringComparison.OrdinalIgnoreCase)) ||
+            (x.Item1.Equals(y.Item2,StringComparison.OrdinalIgnoreCase) && x.Item2.Equals(y.Item1,StringComparison.OrdinalIgnoreCase));
+        public int GetHashCode((string,string) o) =>
+            StringComparer.OrdinalIgnoreCase.GetHashCode(o.Item1) ^ StringComparer.OrdinalIgnoreCase.GetHashCode(o.Item2);
+    }
+
+    void ComputeStreaks() {
+        var days = ghContribWeeks!.SelectMany(w => w.Days).OrderBy(d => d.Date).ToList();
+        int run=0, lng=0, cur=0; var today = DateTime.UtcNow.Date;
+        foreach (var d in days) { if (d.Count>0) run++; else run=0; if (run>lng) lng=run; }
+        foreach (var d in days.AsEnumerable().Reverse()) {
+            if (!DateTime.TryParse(d.Date, out var dt)) break;
+            if (dt.Date > today) continue;
+            if (d.Count > 0) cur++; else break;
+        }
+        longestStreak = lng; currentStreak = cur;
+    }
+
+    void BuildMonthLabels() {
+        monthLabels = []; string? last = null; int col = 1;
+        foreach (var week in ghContribWeeks!) {
+            var first = week.Days.FirstOrDefault();
+            if (first is not null && DateTime.TryParse(first.Date, out var dt)) {
+                var m = dt.ToString("MMM");
+                if (m != last) { monthLabels.Add((m, col)); last = m; }
+            }
+            col++;
+        }
+    }
+
+    async Task<T> FetchAndCache<T>(Task<T> task, string key) {
+        var d = await task; await Cache.SetAsync(key, d); return d;
+    }
+
+    async Task SendMessage() {
         hiringMsg.SentAt = DateTime.UtcNow;
         await Svc.AddMessageAsync(hiringMsg);
-        messageSent = true;
-        hiringMsg = new();
+        messageSent = true; hiringMsg = new();
     }
 
-    static string GetInitials(string? name)
-    {
+    static string GetInitials(string? name) {
         if (string.IsNullOrWhiteSpace(name)) return "YN";
-        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length >= 2
-            ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
-            : name[..Math.Min(2, name.Length)].ToUpper();
+        var p = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return p.Length >= 2 ? $"{p[0][0]}{p[^1][0]}".ToUpper() : name[..Math.Min(2,name.Length)].ToUpper();
+    }
+
+    static string TimeAgo(DateTime dt) {
+        var d = DateTime.UtcNow - dt;
+        if (d.TotalDays < 1) return "today";
+        if (d.TotalDays < 7) return $"{(int)d.TotalDays}d ago";
+        if (d.TotalDays < 30) return $"{(int)(d.TotalDays/7)}w ago";
+        if (d.TotalDays < 365) return $"{(int)(d.TotalDays/30)}mo ago";
+        return $"{(int)(d.TotalDays/365)}y ago";
     }
 }

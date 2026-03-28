@@ -1,7 +1,6 @@
 @page "/admin/login"
 @inject AdminAuthService Auth
 @inject NavigationManager Nav
-@inject IConfiguration Config
 
 <PageTitle>Admin Login</PageTitle>
 
@@ -21,21 +20,28 @@
                 <label>Password</label>
                 <InputText @bind-Value="model.Password" type="password" class="form-control" />
             </div>
-            <button type="submit" class="btn-primary" style="width:100%">Login</button>
+            <button type="submit" class="btn-primary" style="width:100%" disabled="@loading">
+                @(loading ? "Logging in..." : "Login")
+            </button>
         </EditForm>
+        <a href="/admin/forgot-password" style="display:block;margin-top:1rem;text-align:center;opacity:.6">Forgot password?</a>
     </div>
 </div>
 
 @code {
     LoginModel model = new();
     string? error;
+    bool loading;
 
-    void DoLogin()
+    async Task DoLogin()
     {
-        if (Auth.Login(model.Username, model.Password, Config))
+        loading = true;
+        error = null;
+        if (await Auth.LoginAsync(model.Username, model.Password))
             Nav.NavigateTo("/admin");
         else
             error = "Invalid credentials.";
+        loading = false;
     }
 
     class LoginModel

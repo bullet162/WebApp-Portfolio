@@ -15,4 +15,6 @@ public class SiteProfile
     public string? LinkedInUrl { get; set; }
     public string? HeroBio { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? GitHubUsername { get; set; }
+    public string? ResumeUrl { get; set; }
 }
