@@ -1,0 +1,41 @@
+@page "/admin"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+<div class="dashboard-stats">
+    <div class="stat-card">
+        <span class="stat-num">@expCount</span>
+        <span>Experiences</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">@skillCount</span>
+        <span>Skills</span>
+    </div>
+    <div class="stat-card">
+        <span class="stat-num">@projCount</span>
+        <span>Projects</span>
+    </div>
+    <div class="stat-card highlight">
+        <span class="stat-num">@unreadCount</span>
+        <span>Unread Messages</span>
+    </div>
+</div>
+
+<p style="margin-top:2rem">Use the sidebar to manage your portfolio content.</p>
+
+@code {
+    int expCount, skillCount, projCount, unreadCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        expCount = (await Svc.GetExperiencesAsync()).Count;
+        skillCount = (await Svc.GetSkillsAsync()).Count;
+        projCount = (await Svc.GetProjectsAsync()).Count;
+        unreadCount = (await Svc.GetMessagesAsync()).Count(m => !m.IsRead);
+    }
+}

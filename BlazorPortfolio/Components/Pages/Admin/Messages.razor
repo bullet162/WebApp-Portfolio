@@ -1,0 +1,86 @@
+@page "/admin/messages"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+
+<PageTitle>Hiring Messages</PageTitle>
+<h1>Hiring Messages</h1>
+
+@if (!items.Any())
+{
+    <p>No messages yet.</p>
+}
+else
+{
+    <table class="admin-table">
+        <thead>
+            <tr><th>Name</th><th>Email</th><th>Subject</th><th>Received</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var msg in items)
+            {
+                <tr class="@(msg.IsRead ? "" : "unread")">
+                    <td>@msg.Name</td>
+                    <td><a href="mailto:@msg.Email">@msg.Email</a></td>
+                    <td>@msg.Subject</td>
+                    <td>@msg.SentAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                    <td>
+                        <button class="btn-sm" @onclick="() => OpenModal(msg)">View</button>
+                        @if (!msg.IsRead)
+                        {
+                            <button class="btn-sm" @onclick="() => MarkRead(msg.Id)">Mark Read</button>
+                        }
+                        <button class="btn-sm danger" @onclick="() => Delete(msg.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (selected is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal-box" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <h3>@selected.Subject</h3>
+                    <span class="modal-meta">From <strong>@selected.Name</strong> &lt;<a href="mailto:@selected.Email">@selected.Email</a>&gt;</span>
+                    <span class="modal-meta">@selected.SentAt.ToLocalTime().ToString("MMMM d, yyyy h:mm tt")</span>
+                </div>
+                <button class="modal-close" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @selected.Message
+            </div>
+            <div class="modal-footer">
+                @if (!selected.IsRead)
+                {
+                    <button class="btn-primary" @onclick="MarkReadAndClose">Mark as Read</button>
+                }
+                <button class="btn-secondary" @onclick="CloseModal">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    List<HiringMessage> items = [];
+    HiringMessage? selected;
+
+    protected override async Task OnInitializedAsync() => await Load();
+    async Task Load() => items = await Svc.GetMessagesAsync();
+
+    void OpenModal(HiringMessage msg) => selected = msg;
+    void CloseModal() => selected = null;
+
+    async Task MarkRead(int id) { await Svc.MarkReadAsync(id); await Load(); }
+    async Task Delete(int id) { await Svc.DeleteMessageAsync(id); await Load(); }
+
+    async Task MarkReadAndClose()
+    {
+        await Svc.MarkReadAsync(selected!.Id);
+        selected = null;
+        await Load();
+    }
+}

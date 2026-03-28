@@ -1,0 +1,46 @@
+@page "/admin/login"
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+@inject IConfiguration Config
+
+<PageTitle>Admin Login</PageTitle>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <h2>Admin Login</h2>
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert-error">@error</div>
+        }
+        <EditForm Model="model" OnValidSubmit="DoLogin">
+            <div class="form-group">
+                <label>Username</label>
+                <InputText @bind-Value="model.Username" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <InputText @bind-Value="model.Password" type="password" class="form-control" />
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%">Login</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    LoginModel model = new();
+    string? error;
+
+    void DoLogin()
+    {
+        if (Auth.Login(model.Username, model.Password, Config))
+            Nav.NavigateTo("/admin");
+        else
+            error = "Invalid credentials.";
+    }
+
+    class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}

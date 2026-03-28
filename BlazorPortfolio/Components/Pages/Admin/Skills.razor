@@ -1,0 +1,78 @@
+@page "/admin/skills"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+
+<PageTitle>Manage Skills</PageTitle>
+<h1>Skills</h1>
+
+<button class="btn-primary" @onclick="AddNew">+ Add Skill</button>
+
+@if (editing is not null)
+{
+    <div class="edit-form">
+        <h3>@(editing.Id == 0 ? "New" : "Edit") Skill</h3>
+        <EditForm Model="editing" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+            <div class="form-group">
+                <label>Name</label>
+                <InputText @bind-Value="editing.Name" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Category (e.g. Frontend, Backend, DevOps)</label>
+                <InputText @bind-Value="editing.Category" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Proficiency (0–100)</label>
+                <InputNumber @bind-Value="editing.Proficiency" class="form-control" />
+            </div>
+            <button type="submit" class="btn-primary">Save</button>
+            <button type="button" class="btn-secondary" @onclick="Cancel">Cancel</button>
+        </EditForm>
+    </div>
+}
+
+<table class="admin-table">
+    <thead>
+        <tr><th>Name</th><th>Category</th><th>Proficiency</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var skill in items)
+        {
+            <tr>
+                <td>@skill.Name</td>
+                <td>@skill.Category</td>
+                <td>@skill.Proficiency%</td>
+                <td>
+                    <button class="btn-sm" @onclick="() => Edit(skill)">Edit</button>
+                    <button class="btn-sm danger" @onclick="() => Delete(skill.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    List<Skill> items = [];
+    Skill? editing;
+
+    protected override async Task OnInitializedAsync() => await Load();
+    async Task Load() => items = await Svc.GetSkillsAsync();
+
+    void AddNew() => editing = new();
+    void Edit(Skill s) => editing = new Skill { Id = s.Id, Name = s.Name, Category = s.Category, Proficiency = s.Proficiency };
+    void Cancel() => editing = null;
+
+    async Task Save()
+    {
+        await Svc.SaveSkillAsync(editing!);
+        editing = null;
+        await Load();
+    }
+
+    async Task Delete(int id)
+    {
+        await Svc.DeleteSkillAsync(id);
+        await Load();
+    }
+}

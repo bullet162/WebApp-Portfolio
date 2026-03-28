@@ -1,0 +1,34 @@
+@inherits LayoutComponentBase
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+@if (!Auth.IsAuthenticated)
+{
+    Nav.NavigateTo("/admin/login", forceLoad: false);
+}
+else
+{
+    <div class="admin-shell">
+        <nav class="admin-sidebar">
+            <div class="admin-brand">⚙️ CMS</div>
+            <NavLink href="/admin" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="/admin/experiences">Experiences</NavLink>
+            <NavLink href="/admin/skills">Skills</NavLink>
+            <NavLink href="/admin/projects">Projects</NavLink>
+            <NavLink href="/admin/messages">Messages</NavLink>
+            <NavLink href="/admin/profile">Profile</NavLink>
+            <button class="logout-btn" @onclick="Logout">Logout</button>
+        </nav>
+        <main class="admin-content">
+            @Body
+        </main>
+    </div>
+}
+
+@code {
+    void Logout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/admin/login");
+    }
+}

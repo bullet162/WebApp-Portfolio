@@ -1,0 +1,175 @@
+@page "/admin/profile"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+@inject CacheService Cache
+
+<PageTitle>Edit Profile</PageTitle>
+<h1>Profile</h1>
+
+@if (profile is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="profile" OnValidSubmit="Save" class="edit-form" style="max-width:700px">
+        <DataAnnotationsValidator />
+
+        @if (!string.IsNullOrEmpty(successMsg))
+        {
+            <div class="alert-success" style="margin-bottom:1rem">
+                <span class="alert-icon">✅</span>
+                <div><strong>@successMsg</strong></div>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(errorMsg))
+        {
+            <div class="alert-error">@errorMsg</div>
+        }
+
+        <h3>Hero Content</h3>
+        <div class="form-group">
+            <label>Owner Name *</label>
+            <InputText @bind-Value="profile.OwnerName" class="form-control" />
+            <ValidationMessage For="() => profile.OwnerName" />
+        </div>
+        <div class="form-group">
+            <label>Eyebrow Text</label>
+            <InputText @bind-Value="profile.Eyebrow" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Tagline</label>
+            <InputText @bind-Value="profile.Tagline" class="form-control" />
+        </div>
+        <div class="form-group">
+            <label>Bio</label>
+            <InputTextArea @bind-Value="profile.HeroBio" class="form-control" rows="4" />
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Primary CTA Label</label>
+                <InputText @bind-Value="profile.HeroCta" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Secondary CTA Label</label>
+                <InputText @bind-Value="profile.HeroSecondaryCta" class="form-control" />
+            </div>
+        </div>
+
+        <h3 style="margin-top:1.5rem">Contact Info</h3>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Email</label>
+                <InputText @bind-Value="profile.Email" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Location</label>
+                <InputText @bind-Value="profile.Location" class="form-control" />
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>GitHub URL</label>
+                <InputText @bind-Value="profile.GitHubUrl" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>LinkedIn URL</label>
+                <InputText @bind-Value="profile.LinkedInUrl" class="form-control" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary">Save Profile</button>
+    </EditForm>
+
+    <div class="edit-form" style="max-width:700px;margin-top:1.5rem">
+        <h3>Profile Picture</h3>
+        @if (!string.IsNullOrEmpty(profile.AvatarUrl))
+        {
+            <img src="@profile.AvatarUrl" alt="Current avatar" class="avatar-preview" />
+        }
+        @if (!string.IsNullOrEmpty(uploadError))
+        {
+            <div class="alert-error">@uploadError</div>
+        }
+        @if (!string.IsNullOrEmpty(uploadSuccess))
+        {
+            <div class="alert-success" style="margin-bottom:1rem">
+                <span class="alert-icon">✅</span>
+                <div><strong>@uploadSuccess</strong></div>
+            </div>
+            @if (!string.IsNullOrEmpty(previewUrl))
+            {
+                <img src="@previewUrl" alt="Uploaded avatar" class="avatar-preview" />
+            }
+        }
+        <div class="form-group" style="margin-top:1rem">
+            <label>Upload Image (JPEG, PNG, WebP — max 2 MB)</label>
+            <InputFile OnChange="HandleUpload" accept="image/jpeg,image/png,image/webp" class="form-control" />
+        </div>
+    </div>
+}
+
+@code {
+    SiteProfile? profile;
+    string? successMsg;
+    string? errorMsg;
+    string? uploadError;
+    string? uploadSuccess;
+    string? previewUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        profile = await Svc.GetProfileAsync();
+    }
+
+    async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(profile!.OwnerName))
+        {
+            errorMsg = "Owner Name is required.";
+            return;
+        }
+        errorMsg = null;
+        await Svc.SaveProfileAsync(profile);
+        await Cache.RemoveAsync(CacheService.Keys.Profile);
+        successMsg = "Profile saved successfully.";
+    }
+
+    async Task HandleUpload(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        uploadSuccess = null;
+        previewUrl = null;
+
+        var file = e.File;
+        var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
+
+        if (!allowed.Contains(file.ContentType))
+        {
+            uploadError = "Only JPEG, PNG, and WebP images are allowed.";
+            return;
+        }
+        if (file.Size > 2 * 1024 * 1024)
+        {
+            uploadError = "File must be 2 MB or smaller.";
+            return;
+        }
+
+        var ext = Path.GetExtension(file.Name);
+        var fileName = $"avatar_{Guid.NewGuid():N}{ext}";
+        var uploadsDir = Path.Combine("wwwroot", "uploads");
+        Directory.CreateDirectory(uploadsDir);
+        var filePath = Path.Combine(uploadsDir, fileName);
+
+        await using var fs = new FileStream(filePath, FileMode.Create);
+        await file.OpenReadStream(2 * 1024 * 1024).CopyToAsync(fs);
+
+        profile!.AvatarUrl = $"/uploads/{fileName}";
+        await Svc.SaveProfileAsync(profile);
+        await Cache.RemoveAsync(CacheService.Keys.Profile);
+
+        previewUrl = profile.AvatarUrl;
+        uploadSuccess = "Image uploaded successfully.";
+    }
+}
