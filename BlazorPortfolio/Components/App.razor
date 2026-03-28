@@ -27,12 +27,6 @@
                     maxRetries: 5,
                     retryIntervalMilliseconds: 3000
                 }
-            },
-            configureSignalR: (builder) => {
-                builder.withUrl("/_blazor", {
-                    transport: signalR.HttpTransportType.WebSockets,
-                    skipNegotiation: true
-                });
             }
         });
     </script>
