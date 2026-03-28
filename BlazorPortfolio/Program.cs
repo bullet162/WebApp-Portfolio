@@ -2,6 +2,7 @@ using BlazorPortfolio.Components;
 using BlazorPortfolio.Data;
 using BlazorPortfolio.Models;
 using BlazorPortfolio.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,12 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddHostedService<KeepAliveService>();
 
 var app = builder.Build();
+
+// Trust the reverse proxy (Render) so antiforgery and HTTPS work correctly
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Warn on missing required secrets
 var requiredSecrets = new[]
