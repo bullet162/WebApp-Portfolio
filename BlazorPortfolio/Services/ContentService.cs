@@ -1,5 +1,6 @@
 using BlazorPortfolio.Data;
 using BlazorPortfolio.Models;
+using BlazorPortfolio.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlazorPortfolio.Services;
@@ -110,5 +111,68 @@ public class ContentService(IDbContextFactory<AppDbContext> factory)
     {
         await using var db = await factory.CreateDbContextAsync();
         await db.HiringMessages.Where(m => m.Id == id).ExecuteDeleteAsync();
+    }
+
+    // ── Collaboration Requests ────────────────────────────────────────────────
+    public async Task<List<CollaborationRequest>> GetCollaborationRequestsAsync(CollaborationStatus? status = null)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var q = db.CollaborationRequests.AsQueryable();
+        if (status.HasValue) q = q.Where(r => r.Status == status.Value);
+        return await q.OrderByDescending(r => r.CreatedAt).ToListAsync();
+    }
+
+    public async Task AddCollaborationRequestAsync(CollaborationRequest req)
+    {
+        req.Status = SpamDetectionService.Evaluate(req);
+        await using var db = await factory.CreateDbContextAsync();
+        db.CollaborationRequests.Add(req);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SetCollaborationStatusAsync(int id, CollaborationStatus newStatus)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var req = await db.CollaborationRequests.FindAsync(id);
+        if (req is null) return;
+
+        // Enforce valid transitions
+        bool allowed = (req.Status, newStatus) switch
+        {
+            (CollaborationStatus.Pending,  CollaborationStatus.Approved) => true,
+            (CollaborationStatus.Pending,  CollaborationStatus.Rejected) => true,
+            (CollaborationStatus.Pending,  CollaborationStatus.Flagged)  => true,
+            (CollaborationStatus.Flagged,  CollaborationStatus.Approved) => true,
+            (CollaborationStatus.Flagged,  CollaborationStatus.Rejected) => true,
+            (CollaborationStatus.Flagged,  CollaborationStatus.Pending)  => true,
+            _ => false
+        };
+
+        if (!allowed) return;
+
+        req.Status = newStatus;
+        req.ReviewedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task DeleteCollaborationRequestAsync(int id)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        await db.CollaborationRequests.Where(r => r.Id == id).ExecuteDeleteAsync();
+    }
+
+    public async Task<List<CollaborationRequest>> GetApprovedCollaboratorsAsync()
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var approved = await db.CollaborationRequests
+            .Where(r => r.Status == CollaborationStatus.Approved)
+            .ToListAsync();
+
+        // Sort by completeness score: portfolio (+1) + message (+1) = max 2
+        return approved
+            .OrderByDescending(r => (string.IsNullOrEmpty(r.PortfolioUrl) ? 0 : 1)
+                                  + (string.IsNullOrEmpty(r.Message) ? 0 : 1))
+            .ThenByDescending(r => r.ReviewedAt)
+            .ToList();
     }
 }

@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SiteProfile> SiteProfiles => Set<SiteProfile>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<CollaborationRequest> CollaborationRequests => Set<CollaborationRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

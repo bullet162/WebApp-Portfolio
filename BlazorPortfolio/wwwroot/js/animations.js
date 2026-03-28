@@ -179,3 +179,31 @@ document.addEventListener('blazor:afterUpdate', () => {
     requestAnimationFrame(window.drawConstellation);
 });
 window.addEventListener('resize', window.drawConstellation, { passive: true });
+
+// ── Collaboration carousel (drag to scroll) ───────────────────────────────
+(function () {
+    function initCarousel() {
+        const wrap = document.querySelector('.collab-carousel-wrap');
+        if (!wrap || wrap.dataset.dragInit) return;
+        wrap.dataset.dragInit = '1';
+
+        let isDown = false, startX = 0, scrollLeft = 0;
+
+        wrap.addEventListener('mousedown', e => {
+            isDown = true;
+            startX = e.pageX - wrap.offsetLeft;
+            scrollLeft = wrap.scrollLeft;
+        });
+        wrap.addEventListener('mouseleave', () => isDown = false);
+        wrap.addEventListener('mouseup', () => isDown = false);
+        wrap.addEventListener('mousemove', e => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - wrap.offsetLeft;
+            wrap.scrollLeft = scrollLeft - (x - startX);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', initCarousel);
+    document.addEventListener('blazor:afterUpdate', () => setTimeout(initCarousel, 80));
+})();

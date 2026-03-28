@@ -465,6 +465,161 @@
     </div>
 </section>
 
+<!-- COLLABORATION NETWORK -->
+<section class="section alt" id="collaborators">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">Network</span>
+            <h2>Collaboration Network</h2>
+            <p>People I've connected and collaborated with.</p>
+        </div>
+        @if (approvedCollaborators is null)
+        {
+            <div class="collab-carousel-wrap">
+                <div class="collab-track">
+                    @for (int i = 0; i < 4; i++) { <div class="skeleton collab-card-skeleton"></div> }
+                </div>
+            </div>
+        }
+        else if (approvedCollaborators.Count == 0)
+        {
+            <div class="collab-empty">
+                <span class="collab-empty-icon">🤝</span>
+                <p>No collaborators yet — be the first to connect!</p>
+                <a href="#connect" class="btn-outline">Send a Request</a>
+            </div>
+        }
+        else
+        {
+            <div class="collab-carousel-wrap">
+                <div class="collab-track">
+                    @foreach (var peer in approvedCollaborators)
+                    {
+                        var p = peer;
+                        <div class="collab-peer-card" @onclick="() => OpenPeerModal(p)" title="Click to view">
+                            <div class="peer-avatar">@p.FirstName[0]@p.LastName[0]</div>
+                            <div class="peer-info">
+                                <span class="peer-name">@p.FirstName @p.LastName</span>
+                                @if (!string.IsNullOrEmpty(p.PortfolioUrl))
+                                {
+                                    <span class="peer-link">Portfolio ↗</span>
+                                }
+                                @if (!string.IsNullOrEmpty(p.Message))
+                                {
+                                    <p class="peer-message">@p.Message</p>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (selectedPeer is not null)
+        {
+            <div class="modal-backdrop" @onclick="ClosePeerModal">
+                <div class="modal-box" @onclick:stopPropagation>
+                    <div class="modal-header">
+                        <div style="display:flex;align-items:center;gap:.75rem">
+                            <div class="peer-avatar">@selectedPeer.FirstName[0]@selectedPeer.LastName[0]</div>
+                            <div>
+                                <h3 style="margin:0">@selectedPeer.FirstName @selectedPeer.LastName</h3>
+                                @if (!string.IsNullOrEmpty(selectedPeer.PortfolioUrl))
+                                {
+                                    <a class="peer-link" href="@selectedPeer.PortfolioUrl" target="_blank" rel="noopener noreferrer">Portfolio ↗</a>
+                                }
+                            </div>
+                        </div>
+                        <button class="modal-close" @onclick="ClosePeerModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        @if (!string.IsNullOrEmpty(selectedPeer.Message))
+                        {
+                            <p style="white-space:pre-wrap">@selectedPeer.Message</p>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No message provided.</p>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" @onclick="ClosePeerModal">Close</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+<!-- CONNECT WITH ME -->
+<section class="section" id="connect">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">Collaborate</span>
+            <h2>Connect With Me</h2>
+        </div>
+        <div class="contact-layout">
+            <div class="contact-info">
+                <p>Looking to collaborate on something interesting? Send a request and I'll review it personally.</p>
+                <ul class="contact-details">
+                    <li><span class="ci-icon">🤝</span> Open to freelance &amp; collaborations</li>
+                    <li><span class="ci-icon">🔍</span> Every request is reviewed manually</li>
+                </ul>
+            </div>
+            <div class="contact-form-wrap">
+                @if (collabSent)
+                {
+                    <div class="alert-success">
+                        <span class="alert-icon">✅</span>
+                        <div>
+                            <strong>Request sent!</strong>
+                            <p>Thanks for reaching out. I'll review your request and get back to you.</p>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <EditForm Model="collabReq" OnValidSubmit="SendCollabRequest" class="contact-form">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="validation-summary" />
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>First Name *</label>
+                                <InputText @bind-Value="collabReq.FirstName" class="form-control" placeholder="Jane" />
+                                <ValidationMessage For="() => collabReq.FirstName" />
+                            </div>
+                            <div class="form-group">
+                                <label>Last Name *</label>
+                                <InputText @bind-Value="collabReq.LastName" class="form-control" placeholder="Doe" />
+                                <ValidationMessage For="() => collabReq.LastName" />
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Email</label>
+                                <InputText @bind-Value="collabReq.Email" class="form-control" placeholder="jane@example.com (optional)" />
+                                <ValidationMessage For="() => collabReq.Email" />
+                            </div>
+                            <div class="form-group">
+                                <label>Portfolio URL</label>
+                                <InputText @bind-Value="collabReq.PortfolioUrl" class="form-control" placeholder="https://yoursite.com (optional)" />
+                                <ValidationMessage For="() => collabReq.PortfolioUrl" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Message <span class="field-hint">(max 500 chars)</span></label>
+                            <InputTextArea @bind-Value="collabReq.Message" class="form-control" rows="4"
+                                           placeholder="Tell me what you'd like to collaborate on... (optional)" />
+                            <ValidationMessage For="() => collabReq.Message" />
+                        </div>
+                        <button type="submit" class="btn-primary btn-full">Send Collaboration Request →</button>
+                    </EditForm>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
 <footer class="site-footer">
     <div class="container footer-inner">
         <span>Designed &amp; Built by <span class="accent">@(profile?.OwnerName ?? "Your Name")</span></span>
@@ -479,6 +634,12 @@
     SiteProfile? profile;
     HiringMessage hiringMsg = new();
     bool messageSent;
+    CollaborationRequest collabReq = new();
+    bool collabSent;
+    List<CollaborationRequest>? approvedCollaborators;
+    CollaborationRequest? selectedPeer;
+    void OpenPeerModal(CollaborationRequest peer) => selectedPeer = peer;
+    void ClosePeerModal() => selectedPeer = null;
 
     GitHubProfile? ghProfile;
     List<GitHubPinnedRepo>? pinnedRepos;
@@ -510,6 +671,8 @@
                  ?? await FetchAndCache(Svc.GetSkillsAsync(), CacheService.Keys.Skills);
         projects = await Cache.GetAsync<List<Project>>(CacheService.Keys.Projects)
                    ?? await FetchAndCache(Svc.GetProjectsAsync(), CacheService.Keys.Projects);
+
+        approvedCollaborators = await Svc.GetApprovedCollaboratorsAsync();
 
         BuildConstellation(); // build from skills immediately
         StateHasChanged();
@@ -675,6 +838,11 @@
         hiringMsg.SentAt = DateTime.UtcNow;
         await Svc.AddMessageAsync(hiringMsg);
         messageSent = true; hiringMsg = new();
+    }
+
+    async Task SendCollabRequest() {
+        await Svc.AddCollaborationRequestAsync(collabReq);
+        collabSent = true; collabReq = new();
     }
 
     static string GetInitials(string? name) {

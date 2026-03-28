@@ -1,0 +1,165 @@
+@page "/admin/connections"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+@using BlazorPortfolio.Models
+
+<PageTitle>Collaboration Requests</PageTitle>
+<h1>Collaboration Requests</h1>
+
+<div class="tab-bar">
+    @foreach (var tab in Tabs)
+    {
+        <button class="tab-btn @(activeTab == tab.Status ? "tab-active" : "")"
+                @onclick="() => SetTab(tab.Status)">
+            @tab.Label
+            @if (CountFor(tab.Status) > 0)
+            {
+                <span class="tab-badge">@CountFor(tab.Status)</span>
+            }
+        </button>
+    }
+</div>
+
+@{
+    var visible = all.Where(r => r.Status == activeTab).ToList();
+}
+
+@if (!visible.Any())
+{
+    <p class="empty-state">No @activeTab.ToString().ToLower() requests.</p>
+}
+else
+{
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Portfolio</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var req in visible)
+                {
+                    <tr>
+                        <td>@req.FirstName @req.LastName</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(req.Email))
+                            {
+                                <a href="mailto:@req.Email">@req.Email</a>
+                            }
+                            else { <span class="text-muted">—</span> }
+                        </td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(req.PortfolioUrl))
+                            {
+                                <a href="@req.PortfolioUrl" target="_blank" rel="noopener noreferrer">View ↗</a>
+                            }
+                            else { <span class="text-muted">—</span> }
+                        </td>
+                        <td>@req.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</td>
+                        <td class="action-cell">
+                            <button class="btn-sm" @onclick="() => OpenModal(req)">View</button>
+                            @if (activeTab == CollaborationStatus.Pending || activeTab == CollaborationStatus.Flagged)
+                            {
+                                <button class="btn-sm success" @onclick="() => Approve(req.Id)">Approve</button>
+                                <button class="btn-sm danger" @onclick="() => Reject(req.Id)">Reject</button>
+                            }
+                            @if (activeTab == CollaborationStatus.Pending)
+                            {
+                                <button class="btn-sm warn" @onclick="() => Flag(req.Id)">Flag</button>
+                            }
+                            @if (activeTab == CollaborationStatus.Flagged)
+                            {
+                                <button class="btn-sm" @onclick="() => Restore(req.Id)">Restore</button>
+                            }
+                            <button class="btn-sm danger" @onclick="() => Delete(req.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (selected is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal-box" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <h3>@selected.FirstName @selected.LastName</h3>
+                    @if (!string.IsNullOrEmpty(selected.Email))
+                    {
+                        <span class="modal-meta">📧 <a href="mailto:@selected.Email">@selected.Email</a></span>
+                    }
+                    @if (!string.IsNullOrEmpty(selected.PortfolioUrl))
+                    {
+                        <span class="modal-meta">🔗 <a href="@selected.PortfolioUrl" target="_blank" rel="noopener noreferrer">@selected.PortfolioUrl</a></span>
+                    }
+                    <span class="modal-meta">Submitted @selected.CreatedAt.ToLocalTime().ToString("MMMM d, yyyy h:mm tt")</span>
+                    <span class="status-badge status-@selected.Status.ToString().ToLower()">@selected.Status</span>
+                </div>
+                <button class="modal-close" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(selected.Message))
+                {
+                    <p>@selected.Message</p>
+                }
+                else
+                {
+                    <p class="text-muted">No message provided.</p>
+                }
+            </div>
+            <div class="modal-footer">
+                @if (selected.Status == CollaborationStatus.Pending || selected.Status == CollaborationStatus.Flagged)
+                {
+                    <button class="btn-primary" @onclick="() => ApproveAndClose(selected.Id)">Approve ✅</button>
+                    <button class="btn-secondary" @onclick="() => RejectAndClose(selected.Id)">Reject ❌</button>
+                }
+                <button class="btn-secondary" @onclick="CloseModal">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    record TabDef(string Label, CollaborationStatus Status);
+    static readonly TabDef[] Tabs =
+    [
+        new("Pending",  CollaborationStatus.Pending),
+        new("Flagged",  CollaborationStatus.Flagged),
+        new("Approved", CollaborationStatus.Approved),
+        new("Rejected", CollaborationStatus.Rejected),
+    ];
+
+    List<CollaborationRequest> all = [];
+    CollaborationStatus activeTab = CollaborationStatus.Pending;
+    CollaborationRequest? selected;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        all = await Svc.GetCollaborationRequestsAsync();
+    }
+
+    int CountFor(CollaborationStatus s) => all.Count(r => r.Status == s);
+    void SetTab(CollaborationStatus s) => activeTab = s;
+    void OpenModal(CollaborationRequest req) => selected = req;
+    void CloseModal() => selected = null;
+
+    async Task Approve(int id) { await Svc.SetCollaborationStatusAsync(id, CollaborationStatus.Approved); await Load(); }
+    async Task Reject(int id)  { await Svc.SetCollaborationStatusAsync(id, CollaborationStatus.Rejected); await Load(); }
+    async Task Flag(int id)    { await Svc.SetCollaborationStatusAsync(id, CollaborationStatus.Flagged);  await Load(); }
+    async Task Restore(int id) { await Svc.SetCollaborationStatusAsync(id, CollaborationStatus.Pending);  await Load(); }
+    async Task Delete(int id)  { await Svc.DeleteCollaborationRequestAsync(id); await Load(); }
+
+    async Task ApproveAndClose(int id) { await Approve(id); selected = null; }
+    async Task RejectAndClose(int id)  { await Reject(id);  selected = null; }
+}
