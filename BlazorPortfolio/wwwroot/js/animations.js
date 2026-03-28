@@ -137,12 +137,10 @@ window.drawConstellation = function () {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // All nodes (including hidden ones) — we need their positions by data-index
     const allNodes = Array.from(document.querySelectorAll('.constellation-node'));
     if (allNodes.length < 2) return;
 
     const wr = wrap.getBoundingClientRect();
-    // Build index → position map (skip hidden nodes)
     const ptMap = {};
     allNodes.forEach(n => {
         if (n.classList.contains('cn-hidden')) return;
@@ -153,62 +151,27 @@ window.drawConstellation = function () {
     });
 
     let edges = null;
-    try {
-        const raw = canvas.dataset.edges;
-        if (raw) edges = JSON.parse(raw);
-    } catch(e) {}
+    try { edges = JSON.parse(canvas.dataset.edges); } catch(e) {}
 
-    const isFiltered = canvas.dataset.category && canvas.dataset.category !== '';
+    const color = canvas.dataset.color || '#00e5ff';
+    const rgb   = hexToRgb(color);
 
     if (edges && edges.length > 0) {
-        edges.forEach(({ a, b, weight, color }) => {
+        edges.forEach(({ a, b, weight }) => {
             const pa = ptMap[a], pb = ptMap[b];
             if (!pa || !pb) return;
-            const alpha = isFiltered ? 0.15 + weight * 0.75 : 0.06 + weight * 0.55;
-            const lw    = isFiltered ? 0.8 + weight * 2.2   : 0.4 + weight * 2.8;
-
-            if (isFiltered && color) {
-                // Category-colored glow line
-                const rgb = hexToRgb(color);
-                ctx.shadowColor = `rgba(${rgb},0.6)`;
-                ctx.shadowBlur  = 6;
-                ctx.beginPath();
-                ctx.moveTo(pa.x, pa.y);
-                ctx.lineTo(pb.x, pb.y);
-                ctx.strokeStyle = `rgba(${rgb},${alpha})`;
-                ctx.lineWidth = lw;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            } else {
-                const grad = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
-                grad.addColorStop(0, `rgba(0,229,255,${alpha})`);
-                grad.addColorStop(1, `rgba(124,111,255,${alpha * 0.7})`);
-                ctx.beginPath();
-                ctx.moveTo(pa.x, pa.y);
-                ctx.lineTo(pb.x, pb.y);
-                ctx.strokeStyle = grad;
-                ctx.lineWidth = lw;
-                ctx.stroke();
-            }
+            const alpha = 0.12 + weight * 0.55;
+            const lw    = 0.6 + weight * 1.8;
+            ctx.shadowColor = `rgba(${rgb},0.4)`;
+            ctx.shadowBlur  = 5;
+            ctx.beginPath();
+            ctx.moveTo(pa.x, pa.y);
+            ctx.lineTo(pb.x, pb.y);
+            ctx.strokeStyle = `rgba(${rgb},${alpha})`;
+            ctx.lineWidth = lw;
+            ctx.stroke();
         });
-    } else {
-        // Fallback: distance-based lines between visible nodes
-        const pts = Object.values(ptMap);
-        const maxDist = canvas.width * 0.28;
-        for (let i = 0; i < pts.length; i++) {
-            for (let j = i + 1; j < pts.length; j++) {
-                const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist > maxDist) continue;
-                const alpha = (1 - dist / maxDist) * 0.2;
-                ctx.beginPath();
-                ctx.moveTo(pts[i].x, pts[i].y);
-                ctx.lineTo(pts[j].x, pts[j].y);
-                ctx.strokeStyle = `rgba(0,229,255,${alpha})`;
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        }
+        ctx.shadowBlur = 0;
     }
 };
 
