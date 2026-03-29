@@ -95,10 +95,10 @@ else
 
     <div class="edit-form" style="max-width:700px;margin-top:1.5rem">
         <h3>Profile Picture</h3>
-        @if (!string.IsNullOrEmpty(profile.AvatarUrl))
-        {
-            <img src="@profile.AvatarUrl" alt="Current avatar" class="avatar-preview" />
-        }
+        <p style="color:var(--text-muted);font-size:.875rem">
+            Upload your image to <a href="https://cloudinary.com" target="_blank">Cloudinary</a> (free tier) or
+            any CDN, then paste the public URL below. This keeps your Neon DB storage lean.
+        </p>
         @if (!string.IsNullOrEmpty(uploadError))
         {
             <div class="alert-error">@uploadError</div>
@@ -109,15 +109,22 @@ else
                 <span class="alert-icon">✅</span>
                 <div><strong>@uploadSuccess</strong></div>
             </div>
-            @if (!string.IsNullOrEmpty(previewUrl))
-            {
-                <img src="@previewUrl" alt="Uploaded avatar" class="avatar-preview" />
-            }
         }
         <div class="form-group" style="margin-top:1rem">
-            <label>Upload Image (JPEG, PNG, WebP — max 2 MB)</label>
-            <InputFile OnChange="HandleUpload" accept="image/jpeg,image/png,image/webp" class="form-control" />
+            <label>Avatar URL (Cloudinary, Firebase Storage, etc.)</label>
+            <InputText @bind-Value="avatarUrlInput" class="form-control"
+                       placeholder="https://res.cloudinary.com/your-cloud/image/upload/v1/avatar.jpg" />
         </div>
+        @if (!string.IsNullOrEmpty(avatarUrlInput))
+        {
+            <img src="@avatarUrlInput" alt="Avatar preview" class="avatar-preview"
+                 style="margin-top:.5rem" onerror="this.style.display='none'" />
+        }
+        else if (!string.IsNullOrEmpty(profile.AvatarUrl))
+        {
+            <img src="@profile.AvatarUrl" alt="Current avatar" class="avatar-preview" style="margin-top:.5rem" />
+        }
+        <button type="button" class="btn-primary" style="margin-top:1rem" @onclick="SaveAvatarUrl">Save Avatar URL</button>
     </div>
 }
 
@@ -127,11 +134,12 @@ else
     string? errorMsg;
     string? uploadError;
     string? uploadSuccess;
-    string? previewUrl;
+    string avatarUrlInput = "";
 
     protected override async Task OnInitializedAsync()
     {
         profile = await Svc.GetProfileAsync();
+        avatarUrlInput = profile.AvatarUrl ?? "";
     }
 
     async Task Save()
@@ -155,40 +163,22 @@ else
         successMsg = "GitHub cache cleared — data will refresh on next page load.";
     }
 
-    async Task HandleUpload(InputFileChangeEventArgs e)
+    async Task SaveAvatarUrl()
     {
         uploadError = null;
         uploadSuccess = null;
-        previewUrl = null;
 
-        var file = e.File;
-        var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
-
-        if (!allowed.Contains(file.ContentType))
+        if (string.IsNullOrWhiteSpace(avatarUrlInput) ||
+            !Uri.TryCreate(avatarUrlInput.Trim(), UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
         {
-            uploadError = "Only JPEG, PNG, and WebP images are allowed.";
-            return;
-        }
-        if (file.Size > 2 * 1024 * 1024)
-        {
-            uploadError = "File must be 2 MB or smaller.";
+            uploadError = "Please enter a valid image URL (http/https).";
             return;
         }
 
-        var ext = Path.GetExtension(file.Name);
-        var fileName = $"avatar_{Guid.NewGuid():N}{ext}";
-        var uploadsDir = Path.Combine("wwwroot", "uploads");
-        Directory.CreateDirectory(uploadsDir);
-        var filePath = Path.Combine(uploadsDir, fileName);
-
-        await using var fs = new FileStream(filePath, FileMode.Create);
-        await file.OpenReadStream(2 * 1024 * 1024).CopyToAsync(fs);
-
-        profile!.AvatarUrl = $"/uploads/{fileName}";
+        profile!.AvatarUrl = avatarUrlInput.Trim();
         await Svc.SaveProfileAsync(profile);
         await Cache.RemoveAsync(CacheService.Keys.Profile);
-
-        previewUrl = profile.AvatarUrl;
-        uploadSuccess = "Image uploaded successfully.";
+        uploadSuccess = "Avatar URL saved.";
     }
 }

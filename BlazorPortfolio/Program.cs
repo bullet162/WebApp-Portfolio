@@ -4,9 +4,23 @@ using BlazorPortfolio.Models;
 using BlazorPortfolio.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Brotli + Gzip compression for static assets and API responses
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.EnableForHttps = true;
+    opts.Providers.Add<BrotliCompressionProvider>();
+    opts.Providers.Add<GzipCompressionProvider>();
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(opts =>
+    opts.Level = System.IO.Compression.CompressionLevel.Fastest);
+
+// Server-side memory cache (replaces JS sessionStorage cache)
+builder.Services.AddMemoryCache();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
@@ -94,6 +108,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseWebSockets();
+app.UseResponseCompression();
 app.UseStaticFiles();
 app.UseAntiforgery();
 app.MapStaticAssets();
