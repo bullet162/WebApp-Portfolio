@@ -2,16 +2,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Restore dependencies
-COPY BlazorPortfolio/BlazorPortfolio.csproj BlazorPortfolio/
-RUN dotnet restore BlazorPortfolio/BlazorPortfolio.csproj
-
-# Copy source and publish
 COPY BlazorPortfolio/ BlazorPortfolio/
+
 RUN dotnet publish BlazorPortfolio/BlazorPortfolio.csproj \
     -c Release \
-    -o /app/publish \
-    --no-restore
+    -o /app/publish
+
+RUN ls /app/publish/wwwroot/_framework/
 
 # Stage 2: runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
