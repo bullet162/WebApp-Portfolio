@@ -95,10 +95,6 @@ else
 
     <div class="edit-form" style="max-width:700px;margin-top:1.5rem">
         <h3>Profile Picture</h3>
-        @if (!string.IsNullOrEmpty(profile.AvatarUrl) && !profile.AvatarUrl.StartsWith("/uploads/"))
-        {
-            <img src="@profile.AvatarUrl" alt="Current avatar" class="avatar-preview" />
-        }
         @if (!string.IsNullOrEmpty(uploadError))
         {
             <div class="alert-error">@uploadError</div>
@@ -109,15 +105,20 @@ else
                 <span class="alert-icon">✅</span>
                 <div><strong>@uploadSuccess</strong></div>
             </div>
-            @if (!string.IsNullOrEmpty(previewUrl))
-            {
-                <img src="@previewUrl" alt="Uploaded avatar" class="avatar-preview" />
-            }
         }
+
         <div class="form-group" style="margin-top:1rem">
-            <label>Upload Image (JPEG, PNG, WebP — max 2 MB)</label>
-            <InputFile OnChange="HandleUpload" accept="image/jpeg,image/png,image/webp" class="form-control" />
+            <label>Avatar URL</label>
+            <InputText @bind-Value="avatarUrlInput" class="form-control"
+                       placeholder="https://i.imgur.com/yourimage.jpg" />
+            <small style="color:var(--text-muted)">Paste any public image URL (Imgur, GitHub, etc.)</small>
         </div>
+        <button type="button" class="btn-primary" style="margin-top:.5rem" @onclick="SaveAvatarUrl">Save URL</button>
+
+        @if (!string.IsNullOrEmpty(profile.AvatarUrl) && !profile.AvatarUrl.StartsWith("/uploads/"))
+        {
+            <img src="@profile.AvatarUrl" alt="Current avatar" class="avatar-preview" style="margin-top:1rem" />
+        }
     </div>
 }
 
@@ -127,11 +128,12 @@ else
     string? errorMsg;
     string? uploadError;
     string? uploadSuccess;
-    string? previewUrl;
+    string avatarUrlInput = "";
 
     protected override async Task OnInitializedAsync()
     {
         profile = await Svc.GetProfileAsync();
+        avatarUrlInput = profile.AvatarUrl?.StartsWith("/uploads/") == true ? "" : profile.AvatarUrl ?? "";
     }
 
     async Task Save()
@@ -155,40 +157,22 @@ else
         successMsg = "GitHub cache cleared — data will refresh on next page load.";
     }
 
-    async Task HandleUpload(InputFileChangeEventArgs e)
+    async Task SaveAvatarUrl()
     {
         uploadError = null;
         uploadSuccess = null;
-        previewUrl = null;
 
-        var file = e.File;
-        var allowed = new[] { "image/jpeg", "image/png", "image/webp" };
-
-        if (!allowed.Contains(file.ContentType))
+        if (string.IsNullOrWhiteSpace(avatarUrlInput) ||
+            !Uri.TryCreate(avatarUrlInput.Trim(), UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
         {
-            uploadError = "Only JPEG, PNG, and WebP images are allowed.";
-            return;
-        }
-        if (file.Size > 2 * 1024 * 1024)
-        {
-            uploadError = "File must be 2 MB or smaller.";
+            uploadError = "Please enter a valid image URL (http/https).";
             return;
         }
 
-        var ext = Path.GetExtension(file.Name);
-        var fileName = $"avatar_{Guid.NewGuid():N}{ext}";
-        var uploadsDir = Path.Combine("wwwroot", "uploads");
-        Directory.CreateDirectory(uploadsDir);
-        var filePath = Path.Combine(uploadsDir, fileName);
-
-        await using var fs = new FileStream(filePath, FileMode.Create);
-        await file.OpenReadStream(2 * 1024 * 1024).CopyToAsync(fs);
-
-        profile!.AvatarUrl = $"/uploads/{fileName}";
+        profile!.AvatarUrl = avatarUrlInput.Trim();
         await Svc.SaveProfileAsync(profile);
         await Cache.RemoveAsync(CacheService.Keys.Profile);
-
-        previewUrl = profile.AvatarUrl;
-        uploadSuccess = "Image uploaded successfully.";
+        uploadSuccess = "Avatar URL saved.";
     }
 }
