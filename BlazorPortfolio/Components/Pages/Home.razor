@@ -29,9 +29,14 @@
         </div>
         <div class="hero-avatar">
             <div class="avatar-ring">
-                @if (!string.IsNullOrEmpty(profile?.AvatarUrl) && !profile.AvatarUrl.StartsWith("/uploads/"))
+                @{
+                    var avatarSrc = (!string.IsNullOrEmpty(profile?.AvatarUrl) && !profile.AvatarUrl.StartsWith("/uploads/"))
+                        ? profile.AvatarUrl
+                        : ghProfile?.AvatarUrl;
+                }
+                @if (!string.IsNullOrEmpty(avatarSrc))
                 {
-                    <img class="avatar-img" src="@profile.AvatarUrl" alt="@profile.OwnerName" />
+                    <img class="avatar-img" src="@avatarSrc" alt="@profile?.OwnerName" />
                 }
                 else
                 {
