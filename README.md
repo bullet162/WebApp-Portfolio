@@ -104,6 +104,28 @@ Navigate to `/admin/login`. On first run, credentials are set via `appsettings.j
 | `Resend__ApiKey` | Resend API key for email |
 | `KeepAlive__BaseUrl` | Health check URL (for Render free tier) |
 
+## Keep-Alive (Render Free Tier)
+
+Render's free tier spins down services after ~15 minutes of inactivity, causing slow cold starts for the first visitor.
+
+This repo includes two mechanisms to combat that:
+
+**1. GitHub Actions pinger** (`.github/workflows/keepalive.yml`)
+A scheduled workflow that hits the `/health` endpoint every 14 minutes, Monday–Friday 6am–12am Philippine Time (UTC+8). This keeps the app warm during active hours without any third-party service.
+
+To use it in your own fork, just push the repo — GitHub picks up the workflow automatically. No secrets or extra configuration needed.
+
+**2. WarmUpService** (`BlazorPortfolio/Services/WarmUpService.cs`)
+A hosted background service that runs 5 seconds after the app boots. It pre-loads all portfolio and GitHub data into the server-side memory cache in parallel, so the first real visitor gets a fast page load even after a cold start.
+
+To configure the keep-alive URL, set the `KeepAlive__BaseUrl` environment variable to your deployed app's health endpoint:
+
+```
+KeepAlive__BaseUrl=https://your-app.onrender.com/health
+```
+
+> If you fork this repo, update the URL in `.github/workflows/keepalive.yml` to point to your own Render deployment.
+
 ## License
 
 MIT
