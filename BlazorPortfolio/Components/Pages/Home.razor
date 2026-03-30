@@ -666,51 +666,90 @@
     record ConstellationEdge(int A, int B, double Weight);
     record ConstellationSystem(string Name, string Color, List<ConstellationNode> Nodes, List<ConstellationEdge> Edges);
 
+    protected override async Task OnInitializedAsync()
+    {
+        // Load all portfolio DB data in parallel — cache hit = near-instant
+        var profileTask      = Cache.GetAsync<SiteProfile>(CacheService.Keys.Profile);
+        var experiencesTask  = Cache.GetAsync<List<Experience>>(CacheService.Keys.Experiences);
+        var skillsTask       = Cache.GetAsync<List<Skill>>(CacheService.Keys.Skills);
+        var projectsTask     = Cache.GetAsync<List<Project>>(CacheService.Keys.Projects);
+        var collabTask       = Cache.GetAsync<List<CollaborationRequest>>(CacheService.Keys.Collaborators);
+
+        await Task.WhenAll(profileTask, experiencesTask, skillsTask, projectsTask, collabTask);
+
+        profile     = profileTask.Result     ?? await FetchAndCache(Svc.GetProfileAsync(),        CacheService.Keys.Profile);
+        experiences = experiencesTask.Result ?? await FetchAndCache(Svc.GetExperiencesAsync(),    CacheService.Keys.Experiences);
+        skills      = skillsTask.Result      ?? await FetchAndCache(Svc.GetSkillsAsync(),         CacheService.Keys.Skills);
+        projects    = projectsTask.Result    ?? await FetchAndCache(Svc.GetProjectsAsync(),       CacheService.Keys.Projects);
+        approvedCollaborators = collabTask.Result ?? await FetchAndCache(Svc.GetApprovedCollaboratorsAsync(), CacheService.Keys.Collaborators);
+
+        BuildConstellation();
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        profile = await Cache.GetAsync<SiteProfile>(CacheService.Keys.Profile)
-                  ?? await FetchAndCache(Svc.GetProfileAsync(), CacheService.Keys.Profile);
-        experiences = await Cache.GetAsync<List<Experience>>(CacheService.Keys.Experiences)
-                      ?? await FetchAndCache(Svc.GetExperiencesAsync(), CacheService.Keys.Experiences);
-        skills = await Cache.GetAsync<List<Skill>>(CacheService.Keys.Skills)
-                 ?? await FetchAndCache(Svc.GetSkillsAsync(), CacheService.Keys.Skills);
-        projects = await Cache.GetAsync<List<Project>>(CacheService.Keys.Projects)
-                   ?? await FetchAndCache(Svc.GetProjectsAsync(), CacheService.Keys.Projects);
-
-        approvedCollaborators = await Svc.GetApprovedCollaboratorsAsync();
-
-        BuildConstellation(); // build from skills immediately
-        StateHasChanged();
-
         if (!string.IsNullOrWhiteSpace(profile?.GitHubUsername))
         {
             var username = profile.GitHubUsername;
-            ghProfile = await Cache.GetAsync<GitHubProfile>(CacheService.Keys.GitHubProfile)
-                        ?? await FetchAndCache(GitHub.GetProfileAsync(username), CacheService.Keys.GitHubProfile);
-            StateHasChanged();
 
-            var pinnedTask = Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubPinned);
-            var allTask    = Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubAllRepos);
-            await Task.WhenAll(pinnedTask, allTask);
+            // Check cache for all GitHub data at once
+            var ghProfileTask = Cache.GetAsync<GitHubProfile>(CacheService.Keys.GitHubProfile);
+            var pinnedTask    = Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubPinned);
+            var contribTask   = Cache.GetAsync<List<GitHubContributionWeek>>(CacheService.Keys.GitHubContributions);
+            var contribTotTask = Cache.GetAsync<int>(CacheService.Keys.GitHubContribTotal);
 
-            pinnedRepos = pinnedTask.Result ?? await FetchAndCache(GitHub.GetPinnedReposAsync(username), CacheService.Keys.GitHubPinned);
-            allRepos    = allTask.Result    ?? await FetchAndCache(GitHub.GetAllPublicReposAsync(username), CacheService.Keys.GitHubAllRepos);
+            await Task.WhenAll(ghProfileTask, pinnedTask, contribTask, contribTotTask);
+
+            ghProfile      = ghProfileTask.Result;
+            pinnedRepos    = pinnedTask.Result;
+            ghContribWeeks = contribTask.Result;
+            ghContribTotal = contribTotTask.Result;
+
+            // Fetch anything not in cache — profile + pinned in parallel
+            var needGhProfile = ghProfile is null;
+            var needPinned    = pinnedRepos is null;
+            var needContrib   = ghContribWeeks is null;
+
+            if (needGhProfile || needPinned)
+            {
+                var fetchTasks = new List<Task>();
+                Task<GitHubProfile?>? fetchGhProfile = null;
+                Task<List<GitHubPinnedRepo>>? fetchPinned = null;
+
+                if (needGhProfile) fetchTasks.Add(fetchGhProfile = GitHub.GetProfileAsync(username));
+                if (needPinned)    fetchTasks.Add(fetchPinned    = GitHub.GetPinnedReposAsync(username));
+
+                await Task.WhenAll(fetchTasks);
+
+                if (fetchGhProfile is not null)
+                {
+                    ghProfile = await fetchGhProfile;
+                    if (ghProfile is not null) await Cache.SetAsync(CacheService.Keys.GitHubProfile, ghProfile);
+                }
+                if (fetchPinned is not null)
+                {
+                    pinnedRepos = await fetchPinned ?? [];
+                    await Cache.SetAsync(CacheService.Keys.GitHubPinned, pinnedRepos);
+                }
+            }
+
             pinnedRepos ??= [];
-            allRepos    ??= [];
-
-            BuildConstellation(); // rebuild with GitHub data merged in
             StateHasChanged();
 
-            ghContribWeeks = await Cache.GetAsync<List<GitHubContributionWeek>>(CacheService.Keys.GitHubContributions);
-            ghContribTotal = await Cache.GetAsync<int>(CacheService.Keys.GitHubContribTotal);
-            if (ghContribWeeks is null)
+            // All repos — lazy load (only shown on tab switch, lower priority)
+            allRepos = await Cache.GetAsync<List<GitHubPinnedRepo>>(CacheService.Keys.GitHubAllRepos)
+                       ?? await FetchAndCache(GitHub.GetAllPublicReposAsync(username), CacheService.Keys.GitHubAllRepos);
+            allRepos ??= [];
+            StateHasChanged();
+
+            if (needContrib)
             {
                 var (weeks, total) = await GitHub.GetContributionsAsync(username);
                 ghContribWeeks = weeks; ghContribTotal = total;
                 await Cache.SetAsync(CacheService.Keys.GitHubContributions, weeks);
-                await Cache.SetAsync(CacheService.Keys.GitHubContribTotal, total);
+                await Cache.SetAsync(CacheService.Keys.GitHubContribTotal,  total);
             }
             if (ghContribWeeks is { Count: > 0 }) { ComputeStreaks(); BuildMonthLabels(); }
             StateHasChanged();

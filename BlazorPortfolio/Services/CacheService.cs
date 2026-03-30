@@ -39,5 +39,6 @@ public class CacheService(IMemoryCache cache)
         public const string GitHubContributions  = "gh_contributions";
         public const string GitHubContribTotal   = "gh_contrib_total";
         public const string GitHubAllRepos       = "gh_all_repos";
+        public const string Collaborators        = "portfolio_collaborators";
     }
 }

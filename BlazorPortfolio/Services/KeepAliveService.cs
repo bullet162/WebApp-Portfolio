@@ -17,7 +17,7 @@ public class KeepAliveService : IHostedService, IDisposable
         _http = httpClient;
         _baseUrl = config["KeepAlive:BaseUrl"];
         _interval = TimeSpan.FromMinutes(
-            double.TryParse(config["KeepAlive:IntervalMinutes"], out var m) && m >= 10 ? m : 10);
+            double.TryParse(config["KeepAlive:IntervalMinutes"], out var m) && m >= 1 ? m : 14);
     }
 
     public Task StartAsync(CancellationToken ct)

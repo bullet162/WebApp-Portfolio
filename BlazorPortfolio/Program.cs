@@ -51,6 +51,7 @@ builder.Services.AddScoped<CacheService>();
 builder.Services.AddScoped<GitHubService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddHostedService<KeepAliveService>();
+builder.Services.AddHostedService<WarmUpService>();
 
 var app = builder.Build();
 
