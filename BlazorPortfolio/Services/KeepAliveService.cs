@@ -27,21 +27,20 @@ public class KeepAliveService : IHostedService, IDisposable
             _logger.LogWarning("KeepAlive:BaseUrl is not configured. Keep-alive pings are disabled.");
             return Task.CompletedTask;
         }
-        _timer = new Timer(Ping, null, _interval, _interval);
+        // Fire immediately on startup, then repeat on interval
+        _timer = new Timer(Ping, null, TimeSpan.Zero, _interval);
         return Task.CompletedTask;
     }
 
     private async void Ping(object? _)
     {
-        var now = DateTime.Now;
-        if (now.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return;
-        if (now.Hour < 6 || now.Hour >= 22) return;
-
         try
         {
             var resp = await _http.GetAsync(_baseUrl);
             if (!resp.IsSuccessStatusCode)
                 _logger.LogWarning("Keep-alive ping returned {Status}", resp.StatusCode);
+            else
+                _logger.LogInformation("Keep-alive ping OK at {Time}", DateTime.UtcNow);
         }
         catch (Exception ex)
         {
