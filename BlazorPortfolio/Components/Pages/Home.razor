@@ -3,6 +3,7 @@
 @inject ContentService Svc
 @inject CacheService Cache
 @inject GitHubService GitHub
+@inject IJSRuntime JS
 
 <PageTitle>@(profile?.OwnerName ?? "Portfolio")</PageTitle>
 <HeadContent>
@@ -137,7 +138,7 @@
     </div>
 </section>
 
-<!-- TECH CONSTELLATION -->
+<!-- STAR MAP -->
 @if (constellations.Count > 0)
 {
     <section class="section" id="skills">
@@ -145,7 +146,7 @@
             <div class="section-header">
                 <span class="section-tag">What I Know</span>
                 <h2>Tech Stack</h2>
-                <p>Click a system to explore its constellation.</p>
+                <p>A celestial map of my skills — larger stars mean higher proficiency.</p>
             </div>
             <div class="constellation-legend">
                 @foreach (var sys in constellations)
@@ -153,7 +154,7 @@
                     var s = sys;
                     <span class="cl-item @(activeSystem == s.Name ? "cl-active" : "")"
                           style="@(activeSystem == s.Name ? $"border-color:{s.Color};color:{s.Color}" : "")"
-                          @onclick="() => SetSystem(s.Name)">
+                          @onclick="() => { SetSystem(s.Name); }">
                         <span class="cl-dot" style="background:@s.Color"></span>
                         @s.Name
                     </span>
@@ -162,22 +163,12 @@
             @{
                 var active = constellations.FirstOrDefault(c => c.Name == activeSystem) ?? constellations[0];
             }
-            <div class="constellation-canvas" id="constellation-canvas">
-                <canvas id="constellation-bg"
-                        data-edges="@System.Text.Json.JsonSerializer.Serialize(active.Edges)"
-                        data-color="@active.Color">
+            <div class="starmap-wrap">
+                <canvas id="starmap-canvas"
+                        data-systems="@System.Text.Json.JsonSerializer.Serialize(constellations.Select(c => new { c.Name, c.Color, c.Nodes, c.Edges }))"
+                        data-active="@active.Name">
                 </canvas>
-                <div class="constellation-nodes">
-                    @foreach (var node in active.Nodes)
-                    {
-                        <div class="constellation-node cn-show-label"
-                             style="left:@(node.X)%;top:@(node.Y)%;--size:@(node.Size)px;--color:@active.Color"
-                             data-index="@node.Index">
-                            <div class="cn-dot"></div>
-                            <span class="cn-label @node.LabelDir">@node.Name</span>
-                        </div>
-                    }
-                </div>
+                <div id="starmap-tooltip" class="starmap-tooltip" style="display:none"></div>
             </div>
         </div>
     </section>
@@ -688,6 +679,7 @@
     string repoTab = "pinned";
     List<ConstellationSystem> constellations = [];
     string activeSystem = "";
+    string _lastRenderedSystem = "";
 
     void SetSystem(string name) { activeSystem = name; }
 
@@ -697,26 +689,31 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Load all portfolio DB data in parallel — cache hit = near-instant
-        var profileTask      = Cache.GetAsync<SiteProfile>(CacheService.Keys.Profile);
-        var experiencesTask  = Cache.GetAsync<List<Experience>>(CacheService.Keys.Experiences);
-        var skillsTask       = Cache.GetAsync<List<Skill>>(CacheService.Keys.Skills);
-        var projectsTask     = Cache.GetAsync<List<Project>>(CacheService.Keys.Projects);
-        var collabTask       = Cache.GetAsync<List<CollaborationRequest>>(CacheService.Keys.Collaborators);
+        var profileTask     = Cache.GetAsync<SiteProfile>(CacheService.Keys.Profile);
+        var experiencesTask = Cache.GetAsync<List<Experience>>(CacheService.Keys.Experiences);
+        var skillsTask      = Cache.GetAsync<List<Skill>>(CacheService.Keys.Skills);
+        var projectsTask    = Cache.GetAsync<List<Project>>(CacheService.Keys.Projects);
+        var collabTask      = Cache.GetAsync<List<CollaborationRequest>>(CacheService.Keys.Collaborators);
 
         await Task.WhenAll(profileTask, experiencesTask, skillsTask, projectsTask, collabTask);
 
-        profile     = profileTask.Result     ?? await FetchAndCache(Svc.GetProfileAsync(),        CacheService.Keys.Profile);
-        experiences = experiencesTask.Result ?? await FetchAndCache(Svc.GetExperiencesAsync(),    CacheService.Keys.Experiences);
-        skills      = skillsTask.Result      ?? await FetchAndCache(Svc.GetSkillsAsync(),         CacheService.Keys.Skills);
-        projects    = projectsTask.Result    ?? await FetchAndCache(Svc.GetProjectsAsync(),       CacheService.Keys.Projects);
-        approvedCollaborators = collabTask.Result ?? await FetchAndCache(Svc.GetApprovedCollaboratorsAsync(), CacheService.Keys.Collaborators);
+        profile               = profileTask.Result     ?? await FetchAndCache(Svc.GetProfileAsync(),                      CacheService.Keys.Profile);
+        experiences           = experiencesTask.Result ?? await FetchAndCache(Svc.GetExperiencesAsync(),                  CacheService.Keys.Experiences);
+        skills                = skillsTask.Result      ?? await FetchAndCache(Svc.GetSkillsAsync(),                       CacheService.Keys.Skills);
+        projects              = projectsTask.Result    ?? await FetchAndCache(Svc.GetProjectsAsync(),                     CacheService.Keys.Projects);
+        approvedCollaborators = collabTask.Result      ?? await FetchAndCache(Svc.GetApprovedCollaboratorsAsync(),         CacheService.Keys.Collaborators);
 
         BuildConstellation();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (constellations.Count > 0 && (firstRender || activeSystem != _lastRenderedSystem))
+        {
+            _lastRenderedSystem = activeSystem;
+            await JS.InvokeVoidAsync("drawStarMap");
+        }
+
         if (!firstRender) return;
 
         if (!string.IsNullOrWhiteSpace(profile?.GitHubUsername))
