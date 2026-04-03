@@ -52,7 +52,7 @@ public class GitHubService(IConfiguration config, ILogger<GitHubService> logger)
     {
         var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("BlazorPortfolio/1.0");
-        client.Timeout = TimeSpan.FromSeconds(15);
+        client.Timeout = TimeSpan.FromSeconds(30);
         if (!string.IsNullOrWhiteSpace(_token))
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", _token);
