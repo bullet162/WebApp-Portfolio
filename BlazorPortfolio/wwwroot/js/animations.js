@@ -153,77 +153,6 @@
     document.addEventListener('DOMContentLoaded', init);
 })();
 
-// ── Tech Constellation canvas lines ──────────────────────────────────────
-function hexToRgb(hex) {
-    const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '0,229,255';
-}
-
-let _lastConstellationKey = null;
-
-window.drawConstellation = function () {
-    const canvas = document.getElementById('constellation-bg');
-    if (!canvas) return;
-
-    // Skip redraw if nothing changed (memoize by edges+color key)
-    const currentKey = canvas.dataset.edges + '|' + canvas.dataset.color;
-    const wrap = canvas.parentElement;
-    const sizeKey = wrap.offsetWidth + 'x' + wrap.offsetHeight;
-    const fullKey = currentKey + '|' + sizeKey;
-    if (fullKey === _lastConstellationKey) return;
-    _lastConstellationKey = fullKey;
-
-    canvas.width  = wrap.offsetWidth;
-    canvas.height = wrap.offsetHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const allNodes = Array.from(document.querySelectorAll('.constellation-node'));
-    if (allNodes.length < 2) return;
-
-    const wr = wrap.getBoundingClientRect();
-    const ptMap = {};
-    allNodes.forEach(n => {
-        if (n.classList.contains('cn-hidden')) return;
-        const idx = parseInt(n.dataset.index, 10);
-        const dot = n.querySelector('.cn-dot');
-        const r   = (dot || n).getBoundingClientRect();
-        ptMap[idx] = { x: r.left + r.width / 2 - wr.left, y: r.top + r.height / 2 - wr.top };
-    });
-
-    let edges = null;
-    try { edges = JSON.parse(canvas.dataset.edges); } catch(e) {}
-
-    const color = canvas.dataset.color || '#00e5ff';
-    const rgb   = hexToRgb(color);
-
-    if (edges && edges.length > 0) {
-        edges.forEach(({ a, b, weight }) => {
-            const pa = ptMap[a], pb = ptMap[b];
-            if (!pa || !pb) return;
-            const alpha = 0.12 + weight * 0.55;
-            const lw    = 0.6 + weight * 1.8;
-            ctx.shadowColor = `rgba(${rgb},0.4)`;
-            ctx.shadowBlur  = 5;
-            ctx.beginPath();
-            ctx.moveTo(pa.x, pa.y);
-            ctx.lineTo(pb.x, pb.y);
-            ctx.strokeStyle = `rgba(${rgb},${alpha})`;
-            ctx.lineWidth = lw;
-            ctx.stroke();
-        });
-        ctx.shadowBlur = 0;
-    }
-};
-
-// Reset memo key on system switch so it always redraws after a tab change
-window.resetConstellationMemo = function () { _lastConstellationKey = null; };
-
-document.addEventListener('blazor:afterUpdate', () => {
-    requestAnimationFrame(window.drawConstellation);
-});
-window.addEventListener('resize', () => { _lastConstellationKey = null; window.drawConstellation(); }, { passive: true });
-
 // ── Collaboration carousel (drag + touch to scroll) ───────────────────────
 (function () {
     function initCarousel() {
@@ -264,4 +193,219 @@ window.addEventListener('resize', () => { _lastConstellationKey = null; window.d
         clearTimeout(carouselTimer);
         carouselTimer = setTimeout(initCarousel, 100);
     });
+})();
+
+// ── Star Map ──────────────────────────────────────────────────────────────
+(function () {
+    let _tooltip = null;
+    let _canvas  = null;
+    let _systems = null;
+    let _active  = null;
+
+    window.drawStarMap = function () {
+        const canvas = document.getElementById('starmap-canvas');
+        if (!canvas) return;
+
+        // Parse data attributes
+        const rawSystems = canvas.dataset.systems;
+        const rawActive  = canvas.dataset.active;
+        if (!rawSystems) return;
+
+        _canvas  = canvas;
+        _systems = JSON.parse(rawSystems);
+        _active  = rawActive;
+
+        _tooltip = document.getElementById('starmap-tooltip');
+
+        render();
+        bindEvents();
+    };
+
+    function render() {
+        const canvas = _canvas;
+        const wrap   = canvas.parentElement;
+        canvas.width  = wrap.offsetWidth;
+        canvas.height = wrap.offsetHeight;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+
+        ctx.clearRect(0, 0, W, H);
+        drawGrid(ctx, W, H);
+
+        for (const sys of _systems) {
+            const isActive = sys.Name === _active;
+            drawSystem(ctx, sys, W, H, isActive);
+        }
+    }
+
+    function drawGrid(ctx, W, H) {
+        const step = Math.round(Math.min(W, H) / 8);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        // vertical lines
+        for (let x = 0; x < W; x += step) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+        }
+        // horizontal lines
+        for (let y = 0; y < H; y += step) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+        }
+        // concentric circles from center
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        const cx = W / 2, cy = H / 2;
+        for (let r = step; r < Math.max(W, H); r += step) {
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        }
+        // RA/Dec style tick marks on edges
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        for (let x = step; x < W; x += step) {
+            ctx.fillText(Math.round(x / W * 360) + '°', x, 12);
+        }
+        ctx.textAlign = 'right';
+        for (let y = step; y < H; y += step) {
+            ctx.fillText('+' + Math.round((1 - y / H) * 90) + '°', 28, y + 4);
+        }
+        ctx.restore();
+    }
+
+    function drawSystem(ctx, sys, W, H, isActive) {
+        const alpha = isActive ? 1 : 0.22;
+        const color = sys.Color;
+
+        // Draw edges (constellation lines)
+        ctx.save();
+        ctx.globalAlpha = isActive ? 0.35 : 0.08;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = isActive ? 1 : 0.5;
+        ctx.setLineDash([4, 6]);
+        for (const e of sys.Edges) {
+            const a = sys.Nodes[e.A], b = sys.Nodes[e.B];
+            if (!a || !b) continue;
+            ctx.beginPath();
+            ctx.moveTo(a.X / 100 * W, a.Y / 100 * H);
+            ctx.lineTo(b.X / 100 * W, b.Y / 100 * H);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Draw stars
+        for (const node of sys.Nodes) {
+            const x = node.X / 100 * W;
+            const y = node.Y / 100 * H;
+            const r = node.Size / 2;
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+
+            // Outer glow
+            const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 3.5);
+            glow.addColorStop(0, color);
+            glow.addColorStop(1, 'transparent');
+            ctx.fillStyle = glow;
+            ctx.beginPath(); ctx.arc(x, y, r * 3.5, 0, Math.PI * 2); ctx.fill();
+
+            // Core star
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = color;
+            ctx.shadowBlur  = r * 4;
+            ctx.beginPath(); ctx.arc(x, y, r * 0.7, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+
+            // Label for active system — always visible
+            if (isActive) {
+                drawLabel(ctx, node, x, y, color, W, H);
+            }
+        }
+    }
+
+    function drawLabel(ctx, node, x, y, color, W, H) {
+        const label = node.Name;
+        ctx.save();
+        ctx.font = '600 11px system-ui, sans-serif';
+        const tw = ctx.measureText(label).width;
+        const pad = 5, lh = 16;
+
+        // Position label: prefer right, flip if near edge
+        let lx = x + node.Size / 2 + 8;
+        let ly = y - lh / 2;
+        if (lx + tw + pad * 2 > W - 4) lx = x - node.Size / 2 - 8 - tw - pad * 2;
+        if (ly < 4) ly = 4;
+        if (ly + lh > H - 4) ly = H - lh - 4;
+
+        // Background pill
+        ctx.fillStyle = 'rgba(10,12,18,0.85)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = 0.95;
+        roundRect(ctx, lx, ly, tw + pad * 2, lh, 4);
+        ctx.fill(); ctx.stroke();
+
+        // Text
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#e8eaf0';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, lx + pad, ly + lh / 2);
+        ctx.restore();
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+    }
+
+    function bindEvents() {
+        const canvas = _canvas;
+        if (canvas.dataset.smBound) return;
+        canvas.dataset.smBound = '1';
+
+        // Hover tooltip for inactive systems
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const W = canvas.width, H = canvas.height;
+            let hit = null;
+
+            for (const sys of _systems) {
+                if (sys.Name === _active) continue; // active already has labels
+                for (const node of sys.Nodes) {
+                    const nx = node.X / 100 * W;
+                    const ny = node.Y / 100 * H;
+                    const dist = Math.hypot(mx - nx, my - ny);
+                    if (dist < node.Size + 6) { hit = { node, nx, ny }; break; }
+                }
+                if (hit) break;
+            }
+
+            if (hit && _tooltip) {
+                _tooltip.textContent = hit.node.Name;
+                _tooltip.style.display = 'block';
+                _tooltip.style.left = hit.nx + 'px';
+                _tooltip.style.top  = hit.ny + 'px';
+            } else if (_tooltip) {
+                _tooltip.style.display = 'none';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (_tooltip) _tooltip.style.display = 'none';
+        });
+
+        // Resize
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => { if (_canvas) render(); }, 200);
+        }, { passive: true });
+    }
 })();
