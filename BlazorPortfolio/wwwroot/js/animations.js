@@ -159,10 +159,20 @@ function hexToRgb(hex) {
     return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '0,229,255';
 }
 
+let _lastConstellationKey = null;
+
 window.drawConstellation = function () {
     const canvas = document.getElementById('constellation-bg');
     if (!canvas) return;
+
+    // Skip redraw if nothing changed (memoize by edges+color key)
+    const currentKey = canvas.dataset.edges + '|' + canvas.dataset.color;
     const wrap = canvas.parentElement;
+    const sizeKey = wrap.offsetWidth + 'x' + wrap.offsetHeight;
+    const fullKey = currentKey + '|' + sizeKey;
+    if (fullKey === _lastConstellationKey) return;
+    _lastConstellationKey = fullKey;
+
     canvas.width  = wrap.offsetWidth;
     canvas.height = wrap.offsetHeight;
     const ctx = canvas.getContext('2d');
@@ -206,20 +216,23 @@ window.drawConstellation = function () {
     }
 };
 
+// Reset memo key on system switch so it always redraws after a tab change
+window.resetConstellationMemo = function () { _lastConstellationKey = null; };
+
 document.addEventListener('blazor:afterUpdate', () => {
     requestAnimationFrame(window.drawConstellation);
 });
-window.addEventListener('resize', window.drawConstellation, { passive: true });
+window.addEventListener('resize', () => { _lastConstellationKey = null; window.drawConstellation(); }, { passive: true });
 
-// ── Collaboration carousel (drag to scroll) ───────────────────────────────
+// ── Collaboration carousel (drag + touch to scroll) ───────────────────────
 (function () {
     function initCarousel() {
         const wrap = document.querySelector('.collab-carousel-wrap');
         if (!wrap || wrap.dataset.dragInit) return;
         wrap.dataset.dragInit = '1';
 
+        // Mouse drag
         let isDown = false, startX = 0, scrollLeft = 0;
-
         wrap.addEventListener('mousedown', e => {
             isDown = true;
             startX = e.pageX - wrap.offsetLeft;
@@ -230,9 +243,19 @@ window.addEventListener('resize', window.drawConstellation, { passive: true });
         wrap.addEventListener('mousemove', e => {
             if (!isDown) return;
             e.preventDefault();
-            const x = e.pageX - wrap.offsetLeft;
-            wrap.scrollLeft = scrollLeft - (x - startX);
+            wrap.scrollLeft = scrollLeft - (e.pageX - wrap.offsetLeft - startX);
         });
+
+        // Touch swipe
+        let touchStartX = 0, touchScrollLeft = 0;
+        wrap.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].pageX;
+            touchScrollLeft = wrap.scrollLeft;
+        }, { passive: true });
+        wrap.addEventListener('touchmove', e => {
+            const dx = touchStartX - e.touches[0].pageX;
+            wrap.scrollLeft = touchScrollLeft + dx;
+        }, { passive: true });
     }
 
     document.addEventListener('DOMContentLoaded', initCarousel);

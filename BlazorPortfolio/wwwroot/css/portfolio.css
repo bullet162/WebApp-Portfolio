@@ -1105,4 +1105,7 @@ textarea.form-control { resize: vertical; }
 
     /* ── Stop brand dot pulsing (subtle but still costs paint) ── */
     .brand-dot { animation: none; }
+
+    /* ── Reduce backdrop blur on header — expensive on low-end Android ── */
+    .site-header { backdrop-filter: blur(8px) saturate(1.1); }
 }

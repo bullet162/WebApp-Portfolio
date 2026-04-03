@@ -4,8 +4,10 @@ using BlazorPortfolio.Models;
 using BlazorPortfolio.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +23,19 @@ builder.Services.Configure<BrotliCompressionProviderOptions>(opts =>
 
 // Server-side memory cache (replaces JS sessionStorage cache)
 builder.Services.AddMemoryCache();
+
+// Rate limiting — protect admin login from brute force
+builder.Services.AddRateLimiter(opts =>
+{
+    opts.AddFixedWindowLimiter("login", o =>
+    {
+        o.PermitLimit         = 5;
+        o.Window              = TimeSpan.FromMinutes(1);
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        o.QueueLimit          = 0;
+    });
+    opts.RejectionStatusCode = 429;
+});
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
@@ -115,6 +130,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseWebSockets();
 app.UseResponseCompression();
+app.UseRateLimiter();
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -138,6 +154,10 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Rate-limit the admin login page — 5 requests/min per IP
+app.MapGet("/admin/login", () => Results.Redirect("/admin/login"))
+    .RequireRateLimiting("login");
 
 app.MapGet("/health", () => Results.Ok("OK"));
 
