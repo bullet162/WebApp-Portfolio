@@ -74,7 +74,7 @@ public class ContentService(IDbContextFactory<AppDbContext> factory)
     public async Task<SiteProfile> GetProfileAsync()
     {
         await using var db = await factory.CreateDbContextAsync();
-        return await db.SiteProfiles.FirstOrDefaultAsync()
+        return await db.SiteProfiles.OrderBy(s => s.Id).FirstOrDefaultAsync()
                ?? new SiteProfile();
     }
 
