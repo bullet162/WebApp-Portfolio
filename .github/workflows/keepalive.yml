@@ -5,12 +5,10 @@ permissions:
 
 on:
   schedule:
-    # Every 14 minutes, Mon–Fri 6am–12am PHT (UTC+8)
-    # PHT 6:00am = UTC 22:00 (prev day), PHT 12:00am = UTC 16:00
-    # Runs UTC: Sun–Thu 22:00 → Fri–Thu 16:00  (covers Mon–Fri PHT window)
-    - cron: '0/14 22-23 * * 0-4'   # Sun–Thu 22:00–23:59 UTC  (Mon–Fri 6am–7:59am PHT)
-    - cron: '0/14 0-15 * * 1-5'    # Mon–Fri 00:00–15:59 UTC  (Mon–Fri 8am–11:59pm PHT)
-    - cron: '0,14,28,42,56 16 * * 1-5' # Mon–Fri 16:00–16:56 UTC (Fri 12:00am PHT cutoff)
+    # Every 10 minutes, Mon–Fri 6pm–10pm PHT (UTC+8)
+    # PHT 6:00pm = UTC 10:00, PHT 10:00pm = UTC 14:00
+    - cron: '0/10 10-13 * * 1-5'       # Mon–Fri 10:00–13:59 UTC (6pm–9:59pm PHT)
+    - cron: '0,10,20,30,40,50 14 * * 1-5' # Mon–Fri 14:00–14:50 UTC (10pm PHT cutoff)
 
 jobs:
   ping:
