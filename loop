@@ -1,0 +1,1 @@
+git status --porcelain | ForEach-Object { $file = $_.Substring(3); git add $file; git commit -m "feat: $file" }
