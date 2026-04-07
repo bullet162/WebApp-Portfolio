@@ -1,6 +1,7 @@
 @rendermode InteractiveServer
 @inject GitHubService GitHub
 @inject CacheService Cache
+@inject IJSRuntime JS
 
 @if (!string.IsNullOrWhiteSpace(GitHubUsername))
 {
@@ -189,27 +190,7 @@
                                     <span></span><span>Mon</span><span></span>
                                     <span>Wed</span><span></span><span>Fri</span><span></span>
                                 </div>
-                                <div class="gh-weeks">
-                                    @foreach (var week in ghContribWeeks)
-                                    {
-                                        <div class="gh-week">
-                                            @for (int d = 0; d < 7; d++)
-                                            {
-                                                var day = week.Days.FirstOrDefault(x => x.DayOfWeek == d);
-                                                if (day is not null)
-                                                {
-                                                    <span class="gh-cell @(day.Count > 0 ? "has-contrib" : "gh-cell-zero")"
-                                                          style="background:@day.Color"
-                                                          title="@day.Date — @day.Count contribution@(day.Count == 1 ? "" : "s")"></span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="gh-cell gh-cell-empty"></span>
-                                                }
-                                            }
-                                        </div>
-                                    }
-                                </div>
+                                <canvas id="contrib-canvas" class="gh-contrib-canvas" aria-label="GitHub contribution graph"></canvas>
                             </div>
                         </div>
                     </div>
@@ -273,6 +254,8 @@
 
         if (ghContribWeeks.Count > 0) { ComputeStreaks(); BuildMonthLabels(); }
         StateHasChanged();
+        if (ghContribWeeks.Count > 0)
+            await JS.InvokeVoidAsync("renderContribGraph", "contrib-canvas", SerializeWeeks());
     }
 
     async Task SetTab(string tab)
@@ -318,6 +301,19 @@
             col++;
         }
     }
+
+    // Serialize only what the canvas renderer needs — avoids passing full C# objects via JS interop
+    object SerializeWeeks() =>
+        ghContribWeeks.Select(w => new
+        {
+            days = w.Days.Select(d => new
+            {
+                dayOfWeek = d.DayOfWeek,
+                date      = d.Date,
+                count     = d.Count,
+                color     = d.Color
+            })
+        });
 
     static string TimeAgo(DateTime dt)
     {
