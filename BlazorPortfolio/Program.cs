@@ -7,8 +7,17 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var allowedFrameAncestors = builder.Configuration
+    .GetSection("Embedding:AllowedFrameAncestors")
+    .Get<string[]>()?
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim())
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray() ?? [];
 
 // Brotli + Gzip compression for static assets and API responses
 builder.Services.AddResponseCompression(opts =>
@@ -47,6 +56,8 @@ builder.Services.AddAntiforgery(options =>
         ? Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest
         : Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
     options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Lax;
+    // We control framing with CSP frame-ancestors below for allow-list support.
+    options.SuppressXFrameOptionsHeader = true;
 });
 
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
@@ -65,6 +76,22 @@ builder.Services.AddHostedService<KeepAliveService>();
 builder.Services.AddHostedService<WarmUpService>();
 
 var app = builder.Build();
+
+var frameAncestorsValue = BuildFrameAncestorsDirective(allowedFrameAncestors);
+
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers.Remove("X-Frame-Options");
+
+        var existingCsp = context.Response.Headers.ContentSecurityPolicy.ToString();
+        context.Response.Headers.ContentSecurityPolicy = UpsertFrameAncestorsDirective(existingCsp, frameAncestorsValue);
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
 
 // Trust the reverse proxy (Render) so antiforgery and HTTPS work correctly
 var forwardedOptions = new ForwardedHeadersOptions
@@ -153,6 +180,30 @@ app.MapRazorComponents<App>()
 app.MapGet("/health", () => Results.Ok("OK"));
 
 app.Run();
+
+static string BuildFrameAncestorsDirective(IEnumerable<string> allowedAncestors)
+{
+    var values = new List<string> { "'self'" };
+    values.AddRange(allowedAncestors);
+    return $"frame-ancestors {string.Join(' ', values)}";
+}
+
+static string UpsertFrameAncestorsDirective(string existingCsp, string frameAncestorsDirective)
+{
+    if (string.IsNullOrWhiteSpace(existingCsp))
+        return frameAncestorsDirective;
+
+    if (Regex.IsMatch(existingCsp, @"(^|;)\s*frame-ancestors\s+[^;]*", RegexOptions.IgnoreCase))
+    {
+        return Regex.Replace(
+            existingCsp,
+            @"(^|;)\s*frame-ancestors\s+[^;]*",
+            match => match.Value.StartsWith(";", StringComparison.Ordinal) ? $"; {frameAncestorsDirective}" : frameAncestorsDirective,
+            RegexOptions.IgnoreCase);
+    }
+
+    return $"{existingCsp.Trim().TrimEnd(';')}; {frameAncestorsDirective}";
+}
 
 // Make Program class accessible for WebApplicationFactory in tests
 public partial class Program { }
