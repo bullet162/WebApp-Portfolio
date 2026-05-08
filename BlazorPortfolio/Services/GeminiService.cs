@@ -60,13 +60,16 @@ public class GeminiService(
         try
         {
             // 1. Gather context from public links
+            logger.LogInformation("Enrichment: gathering context from URLs...");
             var context = await GatherContextAsync(req);
             
             // 2. Build Prompt
             var prompt = BuildPrompt(req, context);
+            logger.LogInformation("Enrichment: prompt built ({Len} chars). Getting models...", prompt.Length);
 
             // 3. Call Gemini with Fallbacks
             var modelsToTry = await GetModelsToTryAsync();
+            logger.LogInformation("Enrichment: trying {Count} models: {Models}", modelsToTry.Count, string.Join(", ", modelsToTry.Take(3)));
             GeminiResponseDto? result = null;
             string? errorMsg = null;
             
@@ -131,22 +134,43 @@ public class GeminiService(
     {
         var sb = new System.Text.StringBuilder();
         
-        if (!string.IsNullOrEmpty(req.PortfolioUrl))
+        // Fetch URLs in parallel with a 5-second overall timeout
+        try
         {
-            var content = await SafeFetchUrlAsync(req.PortfolioUrl);
-            if (!string.IsNullOrEmpty(content)) sb.AppendLine($"Portfolio Content: {content}");
-        }
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var tasks = new List<Task<(string Label, string? Content)>>();
+            
+            if (!string.IsNullOrEmpty(req.PortfolioUrl))
+                tasks.Add(FetchLabeledAsync("Portfolio", req.PortfolioUrl, cts.Token));
+            if (!string.IsNullOrEmpty(req.GitHubUrl))
+                tasks.Add(FetchLabeledAsync("GitHub", req.GitHubUrl, cts.Token));
 
-        if (!string.IsNullOrEmpty(req.GitHubUrl))
+            var results = await Task.WhenAll(tasks);
+            foreach (var (label, content) in results)
+            {
+                if (!string.IsNullOrEmpty(content))
+                    sb.AppendLine($"{label}: {content}");
+            }
+        }
+        catch (OperationCanceledException)
         {
-            var content = await SafeFetchUrlAsync(req.GitHubUrl);
-            if (!string.IsNullOrEmpty(content)) sb.AppendLine($"GitHub/Readme Content: {content}");
+            logger.LogWarning("Context gathering timed out — proceeding with form data only.");
         }
 
         return sb.ToString();
     }
 
-    private async Task<string?> SafeFetchUrlAsync(string url)
+    private async Task<(string Label, string? Content)> FetchLabeledAsync(string label, string url, CancellationToken ct)
+    {
+        try
+        {
+            var content = await SafeFetchUrlAsync(url, ct);
+            return (label, content);
+        }
+        catch { return (label, null); }
+    }
+
+    private async Task<string?> SafeFetchUrlAsync(string url, CancellationToken ct = default)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
         if (uri.Scheme != "http" && uri.Scheme != "https") return null;
@@ -156,7 +180,8 @@ public class GeminiService(
 
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (compatible; JhersonPortfolioBot/1.0)");
             
@@ -166,9 +191,9 @@ public class GeminiService(
             var contentType = response.Content.Headers.ContentType?.MediaType;
             if (contentType == null || !contentType.Contains("html") && !contentType.Contains("text")) return null;
 
-            // Limit response size (512KB)
+            // Limit response size (128KB — we only need 500 chars after strip)
             var bytes = await response.Content.ReadAsByteArrayAsync(cts.Token);
-            if (bytes.Length > 512 * 1024) bytes = bytes.Take(512 * 1024).ToArray();
+            if (bytes.Length > 128 * 1024) bytes = bytes.Take(128 * 1024).ToArray();
 
             var html = System.Text.Encoding.UTF8.GetString(bytes);
             
@@ -177,7 +202,7 @@ public class GeminiService(
             html = Regex.Replace(html, @"<.*?>", " "); // Strip remaining tags
             html = Regex.Replace(html, @"\s+", " "); // Collapse whitespace
             
-            return html.Length > 2000 ? html.Substring(0, 2000) : html;
+            return html.Length > 800 ? html.Substring(0, 800) : html;
         }
         catch (Exception ex)
         {
@@ -189,37 +214,15 @@ public class GeminiService(
     private string BuildPrompt(CollaborationRequest req, string context)
     {
         return $$"""
-        You are a professional technical recruiter and profile optimizer. 
-        Your task is to generate professional profile suggestions for a developer joining Jherson Aguto's Developer Network.
+        Generate a developer profile for {{req.FirstName}} {{req.LastName}} ({{req.RoleTitle}}).
+        Bio: {{req.Message}}
+        Links: {{req.PortfolioUrl}}, {{req.GitHubUrl}}
+        Context: {{context}}
 
-        DATA PROVIDED BY DEVELOPER:
-        - Name: {{req.FirstName}} {{req.LastName}}
-        - Role: {{req.RoleTitle}}
-        - Bio: {{req.Message}}
-        - Links: {{req.PortfolioUrl}}, {{req.GitHubUrl}}, {{req.LinkedInUrl}}
+        Return ONLY this JSON:
+        {"headline":"max 80 chars","summary":"max 300 chars","skills":[{"name":"str","confidence":0.0}],"projectHighlights":[{"title":"str","description":"short"}],"collaborationInterests":["str"],"overallConfidence":0.0,"warnings":["str"]}
 
-        SAMPLED PUBLIC CONTENT:
-        {{context}}
-
-        INSTRUCTIONS:
-        1. Generate an improved, concise Headline (max 100 chars).
-        2. Generate a professional Summary (max 500 chars).
-        3. Identify 5-8 Skills with confidence scores.
-        4. Extract 2-3 Project Highlights.
-        5. Identify 2-3 Collaboration Interests.
-        6. Do NOT infer private/sensitive info (email, address, politics, etc).
-        7. If LinkedIn or other links were blocked, use only the available data.
-        8. Return ONLY valid JSON in the following format:
-
-        {
-          "headline": "string",
-          "summary": "string",
-          "skills": [{ "name": "string", "confidence": 0.0 }],
-          "projectHighlights": [{ "title": "string", "description": "string" }],
-          "collaborationInterests": ["string"],
-          "overallConfidence": 0.0,
-          "warnings": ["string"]
-        }
+        Rules: max 5 skills, max 2 projects, max 2 interests. Be concise. No private info.
         """;
     }
 
@@ -273,7 +276,8 @@ public class GeminiService(
         
         try
         {
-            var response = await http.GetAsync(url);
+            using var discoveryCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var response = await http.GetAsync(url, discoveryCts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 // Do not log the url since it contains the API key
@@ -322,20 +326,24 @@ public class GeminiService(
         var payload = new
         {
             contents = new[] { new { parts = new[] { new { text = prompt } } } },
-            generationConfig = new { response_mime_type = "application/json" }
+            generationConfig = new { response_mime_type = "application/json", max_output_tokens = 1024 }
         };
 
-        var response = await http.PostAsJsonAsync(url, payload);
+        logger.LogInformation("Calling Gemini model '{Model}' for content generation...", modelName);
+        
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        var response = await http.PostAsJsonAsync(url, payload, cts.Token);
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Gemini generation request failed for model '{Model}' with status {Status}.", modelName, response.StatusCode);
             response.EnsureSuccessStatusCode();
         }
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cts.Token);
         using var doc = JsonDocument.Parse(json);
         var contentText = doc.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
 
+        logger.LogInformation("Gemini model '{Model}' responded successfully.", modelName);
         return JsonSerializer.Deserialize<GeminiResponseDto>(contentText ?? "{}", new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
