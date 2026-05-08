@@ -45,17 +45,44 @@
                             <div class="profile-body">
                                 <section class="profile-section">
                                     <h3>About</h3>
+                                    @if (enrichment?.Status == EnrichmentStatus.Ready && !string.IsNullOrEmpty(enrichment.GeneratedHeadline))
+                                    {
+                                        <p style="font-weight: 600; color: var(--cyan); margin-bottom: 0.5rem; font-size: 1.1rem;">@enrichment.GeneratedHeadline</p>
+                                    }
                                     <p class="profile-bio">@peer.Message</p>
+                                    @if (enrichment?.Status == EnrichmentStatus.Ready && !string.IsNullOrEmpty(enrichment.GeneratedSummary))
+                                    {
+                                        <p style="margin-top: 1rem; color: var(--text); line-height: 1.6;">@enrichment.GeneratedSummary</p>
+                                    }
                                 </section>
 
-                                @if (!string.IsNullOrEmpty(peer.Tags))
+                                @if (!string.IsNullOrEmpty(peer.Tags) || (enrichment?.Status == EnrichmentStatus.Ready && !string.IsNullOrEmpty(enrichment.GeneratedSkillsJson)))
                                 {
                                     <section class="profile-section">
                                         <h3>Skills & Expertise</h3>
                                         <div class="tech-tags">
-                                            @foreach (var tag in peer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                            @if (!string.IsNullOrEmpty(peer.Tags))
                                             {
-                                                <span class="tech-tag">@tag.Trim()</span>
+                                                @foreach (var tag in peer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                                {
+                                                    <span class="tech-tag">@tag.Trim()</span>
+                                                }
+                                            }
+                                            
+                                            @if (enrichment?.Status == EnrichmentStatus.Ready && !string.IsNullOrEmpty(enrichment.GeneratedSkillsJson))
+                                            {
+                                                try 
+                                                {
+                                                    var skills = System.Text.Json.JsonSerializer.Deserialize<List<string>>(enrichment.GeneratedSkillsJson);
+                                                    if (skills != null)
+                                                    {
+                                                        foreach (var s in skills.Take(6))
+                                                        {
+                                                            <span class="tech-tag" style="background: rgba(0, 229, 255, 0.1); border-color: rgba(0, 229, 255, 0.2); color: var(--cyan);">@s</span>
+                                                        }
+                                                    }
+                                                }
+                                                catch { }
                                             }
                                         </div>
                                     </section>
@@ -67,7 +94,7 @@
                                         @if (!string.IsNullOrEmpty(peer.PortfolioUrl))
                                         {
                                             <a href="@peer.PortfolioUrl" target="_blank" rel="noopener noreferrer" class="social-card portfolio-link">
-                                                <div class="social-icon"><i class="lucide-icon" data-lucide="globe"></i></div>
+                                                <div class="social-icon"><Icon Name="user" Size="24" /></div>
                                                 <div class="social-text">
                                                     <strong>Portfolio</strong>
                                                     <span>View personal work</span>
@@ -77,7 +104,7 @@
                                         @if (!string.IsNullOrEmpty(peer.GitHubUrl))
                                         {
                                             <a href="@peer.GitHubUrl" target="_blank" rel="noopener noreferrer" class="social-card github-link">
-                                                <div class="social-icon"><i class="lucide-icon" data-lucide="github"></i></div>
+                                                <div class="social-icon"><Icon Name="github" Size="24" /></div>
                                                 <div class="social-text">
                                                     <strong>GitHub</strong>
                                                     <span>Explore repositories</span>
@@ -87,7 +114,7 @@
                                         @if (!string.IsNullOrEmpty(peer.LinkedInUrl))
                                         {
                                             <a href="@peer.LinkedInUrl" target="_blank" rel="noopener noreferrer" class="social-card linkedin-link">
-                                                <div class="social-icon"><i class="lucide-icon" data-lucide="linkedin"></i></div>
+                                                <div class="social-icon"><Icon Name="linkedin" Size="24" /></div>
                                                 <div class="social-text">
                                                     <strong>LinkedIn</strong>
                                                     <span>Connect professionally</span>
@@ -109,7 +136,7 @@
                                 
                                 <div class="badge-preview-container mb-4">
                                     <div class="collab-badge badge-@(peer.PublicSlug?.GetHashCode() % 5 ?? 0)">
-                                        Connected with Jherson Aguto
+                                        Connected with @peer.FirstName @peer.LastName
                                     </div>
                                 </div>
 
@@ -127,7 +154,7 @@
                             </div>
 
                             <div class="mt-4 text-center">
-                                <a href="/#network" class="btn-outline w-100">← All Developers</a>
+                                <a href="/network" class="btn-outline w-100">← All Developers</a>
                             </div>
                         </div>
                     </div>
@@ -140,6 +167,7 @@
 @code {
     [Parameter] public string? slug { get; set; }
     private CollaborationRequest? peer;
+    private DeveloperProfileEnrichment? enrichment;
     private string badgeSnippet = "";
 
     protected override async Task OnInitializedAsync()
@@ -154,8 +182,9 @@
 
         if (peer != null)
         {
+            enrichment = await Svc.GetEnrichmentAsync(peer.Id);
             var profileUrl = $"{Nav.BaseUri}network/{peer.PublicSlug}";
-            badgeSnippet = $"<a href=\"{profileUrl}\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"text-decoration:none;\">\n  <div style=\"padding:10px 20px; background:linear-gradient(135deg, #00e5ff 0%, #1200ff 100%); color:white; border-radius:8px; font-weight:bold; font-family:sans-serif; display:inline-block;\">\n    Connected with Jherson Aguto Developer Network\n  </div>\n</a>";
+            badgeSnippet = $"<a href=\"{profileUrl}\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"text-decoration:none;\">\n  <div style=\"padding:10px 20px; background:linear-gradient(135deg, #00e5ff 0%, #1200ff 100%); color:white; border-radius:8px; font-weight:bold; font-family:sans-serif; display:inline-block;\">\n    Connected with {peer.FirstName} {peer.LastName}\n  </div>\n</a>";
         }
     }
 
