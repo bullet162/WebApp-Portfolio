@@ -11,6 +11,15 @@ using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Fix for Render/Linux "inotify instances has been reached" error
+// Disables file watching for appsettings.json
+builder.Host.ConfigureAppConfiguration((context, config) =>
+{
+    foreach (var source in config.Sources.OfType<Microsoft.Extensions.Configuration.Json.JsonConfigurationSource>())
+    {
+        source.ReloadOnChange = false;
+    }
+});
 var allowedFrameAncestors = builder.Configuration
     .GetSection("Embedding:AllowedFrameAncestors")
     .Get<string[]>()?
