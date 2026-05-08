@@ -1,0 +1,390 @@
+@page "/network"
+@rendermode InteractiveServer
+@inject ContentService Svc
+@inject IConfiguration Configuration
+@using BlazorPortfolio.Models
+
+<PageTitle>Developer Network | Jherson Aguto</PageTitle>
+
+<!-- DEVELOPER NETWORK -->
+<section class="section" id="network-grid" style="padding-top: 100px; min-height: 100vh;">
+    <div class="container">
+        <div class="section-header">
+            <span class="section-tag">Network</span>
+            <div class="title-with-count">
+                <h2>Developer Network</h2>
+                <span class="badge">@(approvedCollaborators?.Count ?? 0)</span>
+            </div>
+            <p>A curated network of professional developers, collaborators, and tech enthusiasts.</p>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="network-controls anim-fade-in">
+            <div class="search-box" style="flex: 1;">
+                <Icon Name="search" Size="18" />
+                <input type="text" @bind="networkSearch" @bind:event="oninput" placeholder="Search by name, role, or skill..." class="form-control" />
+            </div>
+            <button class="btn-primary" @onclick="OpenJoinModal" style="white-space: nowrap;"><Icon Name="user-plus" Size="18" /> Join Network</button>
+        </div>
+        <div class="filter-chips" style="margin-bottom: 2rem;">
+            @foreach (var filter in new[] { "All", "Featured", "Verified", "Reciprocal", "Open to Collaborate" })
+            {
+                var f = filter;
+                <button class="filter-chip @(activeFilter == f ? "active" : "")" @onclick="() => SetFilter(f)">@f</button>
+            }
+        </div>
+
+        @if (approvedCollaborators is null)
+        {
+            <div class="collab-grid">
+                @for (int i = 0; i < 4; i++) { <div class="skeleton collab-card-skeleton"></div> }
+            </div>
+        }
+        else if (!FilteredCollaborators.Any())
+        {
+            <div class="collab-empty">
+                <span class="collab-empty-icon"><Icon Name="users" Size="48" /></span>
+                <p>No developers found matching your criteria.</p>
+            </div>
+        }
+        else
+        {
+            <div class="collab-grid">
+                @foreach (var peer in FilteredCollaborators)
+                {
+                    var p = peer;
+                    var styleIndex = Math.Abs((p.FirstName + p.LastName).GetHashCode()) % 5 + 1;
+                    var badgeClass = $"dev-badge-style-{styleIndex}";
+                    
+                    <div class="collab-peer-card anim-scale" @onclick="() => OpenPeerModal(p)">
+                        <div class="card-badges">
+                            @if (p.IsFeatured) { <span class="card-badge badge-featured" title="Featured Developer"><Icon Name="star" Size="12" /></span> }
+                            @if (p.IsVerified) { <span class="card-badge badge-verified" title="Verified Profile"><Icon Name="shield-check" Size="12" /></span> }
+                            @if (p.ReciprocalLinkVerified) { <span class="card-badge badge-reciprocal" title="Reciprocal Link Verified"><Icon Name="link" Size="12" /></span> }
+                        </div>
+                        
+                        <div class="peer-header">
+                            <div class="peer-avatar @badgeClass">@p.FirstName[0]@p.LastName[0]</div>
+                            <div class="peer-meta">
+                                <span class="peer-name">@p.FirstName @p.LastName</span>
+                                <span class="peer-role">@(string.IsNullOrEmpty(p.RoleTitle) ? "Developer" : p.RoleTitle)</span>
+                            </div>
+                        </div>
+
+                        <div class="peer-body">
+                            @if (!string.IsNullOrEmpty(p.Tags))
+                            {
+                                <div class="peer-tags">
+                                    @foreach (var tag in p.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <span class="peer-tag">@tag.Trim()</span>
+                                    }
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(p.Message))
+                            {
+                                <p class="peer-message">@p.Message</p>
+                            }
+                        </div>
+
+                        <div class="peer-footer">
+                            <div class="peer-external-links">
+                                @if (!string.IsNullOrEmpty(p.PortfolioUrl))
+                                {
+                                    <a href="@p.PortfolioUrl" target="_blank" rel="noopener noreferrer" @onclick:stopPropagation class="peer-link-icon" title="Portfolio"><Icon Name="user" Size="16" /></a>
+                                }
+                                @if (!string.IsNullOrEmpty(p.GitHubUrl))
+                                {
+                                    <a href="@p.GitHubUrl" target="_blank" rel="noopener noreferrer" @onclick:stopPropagation class="peer-link-icon" title="GitHub"><Icon Name="github" Size="16" /></a>
+                                }
+                                @if (!string.IsNullOrEmpty(p.LinkedInUrl))
+                                {
+                                    <a href="@p.LinkedInUrl" target="_blank" rel="noopener noreferrer" @onclick:stopPropagation class="peer-link-icon" title="LinkedIn"><Icon Name="linkedin" Size="16" /></a>
+                                }
+                            </div>
+                            <div class="animated-badge-preview @badgeClass" title="Personalized Developer Badge">
+                                <span class="badge-text">Network Member</span>
+                                <div class="badge-glow"></div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (selectedPeer is not null)
+        {
+            <div class="modal-backdrop" @onclick="ClosePeerModal">
+                <div class="modal-box" style="max-width: 650px;" @onclick:stopPropagation>
+                    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">
+                        <div class="peer-header" style="align-items: center;">
+                            @{
+                                var styleIndex = Math.Abs((selectedPeer.FirstName + selectedPeer.LastName).GetHashCode()) % 5 + 1;
+                                var badgeClass = $"dev-badge-style-{styleIndex}";
+                            }
+                            <div class="peer-avatar @badgeClass" style="width: 50px; height: 50px; font-size: 1.2rem;">@selectedPeer.FirstName[0]@selectedPeer.LastName[0]</div>
+                            <div>
+                                <h3 style="margin:0; font-size: 1.3rem;">@selectedPeer.FirstName @selectedPeer.LastName</h3>
+                                <span class="peer-role" style="color: var(--cyan); font-weight: 500;">@(string.IsNullOrEmpty(selectedPeer.RoleTitle) ? "Developer" : selectedPeer.RoleTitle)</span>
+                            </div>
+                        </div>
+                        <button class="modal-close" @onclick="ClosePeerModal">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding-top: 0;">
+                        @if (!string.IsNullOrEmpty(selectedPeer.Tags))
+                        {
+                            <div class="peer-tags" style="margin-bottom: 1rem;">
+                                @foreach (var tag in selectedPeer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                {
+                                    <span class="peer-tag">@tag.Trim()</span>
+                                }
+                            </div>
+                        }
+
+                        @if (peerEnrichment is not null && peerEnrichment.Status == EnrichmentStatus.Ready)
+                        {
+                            <div class="ai-enrichment-display" style="background: var(--surface2); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 3px solid var(--cyan);">
+                                @if (!string.IsNullOrEmpty(peerEnrichment.GeneratedHeadline))
+                                {
+                                    <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--text-bright); font-size: 1.05rem;">@peerEnrichment.GeneratedHeadline</h4>
+                                }
+                                @if (!string.IsNullOrEmpty(peerEnrichment.GeneratedSummary))
+                                {
+                                    <p style="margin-bottom: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text);">@peerEnrichment.GeneratedSummary</p>
+                                }
+                                
+                                @if (!string.IsNullOrEmpty(peerEnrichment.GeneratedSkillsJson))
+                                {
+                                    try 
+                                    {
+                                        var skills = System.Text.Json.JsonSerializer.Deserialize<List<string>>(peerEnrichment.GeneratedSkillsJson);
+                                        if (skills != null && skills.Any())
+                                        {
+                                            <div style="margin-top: 1rem;">
+                                                <strong style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">AI Detected Skills</strong>
+                                                <div class="peer-tags" style="margin-top: 0.5rem;">
+                                                    @foreach (var s in skills.Take(6))
+                                                    {
+                                                        <span class="peer-tag" style="background: rgba(0, 229, 255, 0.1); border-color: rgba(0, 229, 255, 0.2); color: var(--cyan);">@s</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                    catch { }
+                                }
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(selectedPeer.Message))
+                        {
+                            <p class="modal-message" style="margin-bottom: 1.5rem; font-size: 0.95rem; line-height: 1.6;">@selectedPeer.Message</p>
+                        }
+
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                            @if (!string.IsNullOrEmpty(selectedPeer.PortfolioUrl))
+                            {
+                                <a href="@selectedPeer.PortfolioUrl" target="_blank" rel="noopener noreferrer" class="btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem;"><Icon Name="user" Size="16" /> Portfolio</a>
+                            }
+                            @if (!string.IsNullOrEmpty(selectedPeer.GitHubUrl))
+                            {
+                                <a href="@selectedPeer.GitHubUrl" target="_blank" rel="noopener noreferrer" class="btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem;"><Icon Name="github" Size="16" /> GitHub</a>
+                            }
+                            @if (!string.IsNullOrEmpty(selectedPeer.LinkedInUrl))
+                            {
+                                <a href="@selectedPeer.LinkedInUrl" target="_blank" rel="noopener noreferrer" class="btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem;"><Icon Name="linkedin" Size="16" /> LinkedIn</a>
+                            }
+                        </div>
+                        
+                        @if (!string.IsNullOrEmpty(selectedPeer.PublicSlug))
+                        {
+                            <div class="badge-snippet-box" style="background: var(--dark2); border-radius: 8px; padding: 1.25rem; border: 1px solid var(--border);">
+                                <label style="display: block; font-weight: 600; margin-bottom: 0.25rem;">Developer Badge Snippet</label>
+                                <p class="field-hint" style="margin-bottom: 1rem;">Embed this badge on your portfolio or GitHub profile to show your network connection.</p>
+                                
+                                <div style="display: flex; justify-content: center; margin-bottom: 1.25rem; padding: 1rem; background: var(--dark); border-radius: 6px;">
+                                    <img src="https://img.shields.io/badge/Jherson_Aguto-Developer_Network-7c6fff?style=for-the-badge" alt="Jherson Aguto Developer Network Badge" />
+                                </div>
+
+                                <div class="code-preview" style="background: var(--dark); border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem; overflow-x: auto;">
+                                    <code style="font-size: 0.85rem; color: var(--cyan);">&lt;a href="https://jhersonaguto.dev/network/@selectedPeer.PublicSlug" target="_blank" rel="noopener noreferrer"&gt;&lt;img src="https://img.shields.io/badge/Jherson_Aguto-Developer_Network-7c6fff?style=for-the-badge" alt="Jherson Aguto Developer Network Badge" /&gt;&lt;/a&gt;</code>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (joinModalOpen)
+        {
+            <div class="modal-backdrop" @onclick="CloseJoinModal">
+                <div class="modal-box" style="max-width: 600px; width: 100%;" @onclick:stopPropagation>
+                    <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <h3 style="margin: 0;">Join My Network</h3>
+                            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Connect with me and other developers. Submitting this form adds you to the network pending review.</p>
+                        </div>
+                        <button class="modal-close" @onclick="CloseJoinModal">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding-top: 0;">
+                        @if (collabSent)
+                        {
+                            <div class="alert-success" style="padding: 2rem; text-align: center;">
+                                <span class="alert-icon" style="display: block; margin-bottom: 1rem;"><Icon Name="check-circle" Size="48" /></span>
+                                <div>
+                                    <strong style="font-size: 1.2rem; display: block; margin-bottom: 0.5rem;">Request sent!</strong>
+                                    <p>Thanks for joining the network. I'll review your profile and it will appear once approved.</p>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <EditForm Model="collabReq" OnValidSubmit="SendCollabRequest" class="contact-form">
+                                <DataAnnotationsValidator />
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>First Name *</label>
+                                        <InputText @bind-Value="collabReq.FirstName" class="form-control" placeholder="Jane" />
+                                        <ValidationMessage For="() => collabReq.FirstName" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Last Name *</label>
+                                        <InputText @bind-Value="collabReq.LastName" class="form-control" placeholder="Doe" />
+                                        <ValidationMessage For="() => collabReq.LastName" />
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Email (Admin Only) *</label>
+                                        <InputText @bind-Value="collabReq.Email" class="form-control" placeholder="your@email.com" />
+                                        <ValidationMessage For="() => collabReq.Email" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Portfolio URL</label>
+                                        <InputText @bind-Value="collabReq.PortfolioUrl" class="form-control" placeholder="https://yoursite.com" />
+                                        <ValidationMessage For="() => collabReq.PortfolioUrl" />
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>GitHub URL</label>
+                                        <InputText @bind-Value="collabReq.GitHubUrl" class="form-control" placeholder="https://github.com/username" />
+                                        <ValidationMessage For="() => collabReq.GitHubUrl" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>LinkedIn URL</label>
+                                        <InputText @bind-Value="collabReq.LinkedInUrl" class="form-control" placeholder="https://linkedin.com/in/username" />
+                                        <ValidationMessage For="() => collabReq.LinkedInUrl" />
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>Role / Title</label>
+                                        <InputText @bind-Value="collabReq.RoleTitle" class="form-control" placeholder="e.g. Full Stack Developer" />
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label>Tags (Comma separated)</label>
+                                        <InputText @bind-Value="collabReq.Tags" class="form-control" placeholder="C#, React, PostgreSQL" />
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Message / Collaboration Idea</label>
+                                    <InputTextArea @bind-Value="collabReq.Message" class="form-control" rows="2" placeholder="Tell me about yourself or a project idea..." />
+                                    <ValidationMessage For="() => collabReq.Message" />
+                                </div>
+                                <div class="form-group checkbox-group" style="margin-bottom: 1.5rem; background: rgba(0, 229, 255, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-cyan);">
+                                    <label class="checkbox-label" style="align-items: flex-start; margin: 0;">
+                                        <InputCheckbox @bind-Value="collabReq.AiEnrichmentConsent" style="margin-top: 0.25rem;" />
+                                        <div>
+                                            <span style="line-height: 1.4; display: block; font-weight: 600; color: var(--cyan);">AI Profile Analysis Consent</span>
+                                            <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">I allow AI to analyze my public links to suggest profile details (reviewed by admin).</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <InputText @bind-Value="collabHoneypot" class="hp-field" autocomplete="off" tabindex="-1" style="display:none;" />
+                                <button type="submit" class="btn-primary btn-full">Submit Request →</button>
+                            </EditForm>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+
+
+@code {
+    List<CollaborationRequest>? approvedCollaborators;
+    
+    // Developer Network Filter State
+    string networkSearch = "";
+    string activeFilter = "All";
+    
+    void SetFilter(string filter)
+    {
+        activeFilter = filter;
+    }
+
+    IEnumerable<CollaborationRequest> FilteredCollaborators => 
+        (approvedCollaborators ?? Enumerable.Empty<CollaborationRequest>())
+        .Where(p => 
+            (activeFilter == "All") ||
+            (activeFilter == "Featured" && p.IsFeatured) ||
+            (activeFilter == "Verified" && p.IsVerified) ||
+            (activeFilter == "Reciprocal" && p.ReciprocalLinkVerified) ||
+            (activeFilter == "Open to Collaborate" && p.OpenToCollaborate) ||
+            (p.Tags != null && p.Tags.Contains(activeFilter, StringComparison.OrdinalIgnoreCase))
+        )
+        .Where(p => 
+            string.IsNullOrWhiteSpace(networkSearch) || 
+            (p.FirstName != null && p.FirstName.Contains(networkSearch, StringComparison.OrdinalIgnoreCase)) || 
+            (p.LastName != null && p.LastName.Contains(networkSearch, StringComparison.OrdinalIgnoreCase)) ||
+            (p.RoleTitle != null && p.RoleTitle.Contains(networkSearch, StringComparison.OrdinalIgnoreCase)) ||
+            (p.Tags != null && p.Tags.Contains(networkSearch, StringComparison.OrdinalIgnoreCase))
+        );
+
+    CollaborationRequest? selectedPeer;
+    DeveloperProfileEnrichment? peerEnrichment;
+    
+    async Task OpenPeerModal(CollaborationRequest peer) 
+    {
+        selectedPeer = peer;
+        peerEnrichment = await Svc.GetEnrichmentAsync(peer.Id);
+    }
+    
+    void ClosePeerModal() 
+    {
+        selectedPeer = null;
+        peerEnrichment = null;
+    }
+
+    // Join Network Form State
+    bool joinModalOpen = false;
+    CollaborationRequest collabReq = new() { AiEnrichmentConsent = true }; // Default checked
+    string collabHoneypot = "";
+    bool collabSent;
+
+    void OpenJoinModal() 
+    {
+        collabReq = new() { AiEnrichmentConsent = true };
+        collabSent = false;
+        joinModalOpen = true;
+    }
+    void CloseJoinModal() => joinModalOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // We load the data directly from the service as this page is dedicated
+        approvedCollaborators = await Svc.GetApprovedCollaboratorsAsync();
+    }
+
+    async Task SendCollabRequest()
+    {
+        if (!string.IsNullOrEmpty(collabHoneypot)) return; // Bot trapped
+        
+        // Let's create the request
+        await Svc.AddCollaborationRequestAsync(collabReq);
+        collabSent = true;
+    }
+}
