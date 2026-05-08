@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -26,7 +27,7 @@ public class GeminiService(
     private readonly int _maxModelFallbackAttempts = config.GetValue<int>("Gemini:MaxModelFallbackAttempts", 5);
 
 
-    public async Task<DeveloperProfileEnrichment> EnrichProfileAsync(CollaborationRequest req, Action<string>? onProgress = null)
+    public async Task<DeveloperProfileEnrichment> EnrichProfileAsync(CollaborationRequest req, Action<string>? onProgress = null, CancellationToken ct = default)
     {
         var enrichment = new DeveloperProfileEnrichment
         {
@@ -62,7 +63,7 @@ public class GeminiService(
             // 1. Gather context from public links
             logger.LogInformation("Enrichment: gathering context from URLs...");
             onProgress?.Invoke("Gathering context from Portfolio & GitHub URLs...");
-            var context = await GatherContextAsync(req);
+            var context = await GatherContextAsync(req, onProgress, ct);
             
             // 2. Build Prompt
             var prompt = BuildPrompt(req, context);
@@ -81,7 +82,7 @@ public class GeminiService(
                 try
                 {
                     onProgress?.Invoke($"Calling model: {model}...");
-                    result = await CallGeminiAsync(prompt, model);
+                    result = await CallGeminiAsync(prompt, model, ct);
                     if (result != null)
                     {
                         enrichment.ModelUsed = model;
@@ -136,31 +137,48 @@ public class GeminiService(
         return enrichment;
     }
 
-    private async Task<string> GatherContextAsync(CollaborationRequest req)
+    private async Task<string> GatherContextAsync(CollaborationRequest req, Action<string>? onProgress = null, CancellationToken ct = default)
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
+        // Create a timeout for the entire gathering process, linked to the main cancellation token
+        using var gatheringCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        gatheringCts.CancelAfter(TimeSpan.FromSeconds(8)); 
         
-        // Fetch URLs in parallel with a 5-second overall timeout
+        var tasks = new List<Task<(string Label, string? Content)>>();
+
+        if (!string.IsNullOrEmpty(req.PortfolioUrl))
+        {
+            onProgress?.Invoke("-> Fetching Portfolio: " + req.PortfolioUrl);
+            tasks.Add(FetchLabeledAsync("Portfolio", req.PortfolioUrl, gatheringCts.Token));
+        }
+        if (!string.IsNullOrEmpty(req.GitHubUrl))
+        {
+            onProgress?.Invoke("-> Fetching GitHub: " + req.GitHubUrl);
+            tasks.Add(FetchLabeledAsync("GitHub", req.GitHubUrl, gatheringCts.Token));
+        }
+
+        if (!tasks.Any()) return "";
+
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var tasks = new List<Task<(string Label, string? Content)>>();
-            
-            if (!string.IsNullOrEmpty(req.PortfolioUrl))
-                tasks.Add(FetchLabeledAsync("Portfolio", req.PortfolioUrl, cts.Token));
-            if (!string.IsNullOrEmpty(req.GitHubUrl))
-                tasks.Add(FetchLabeledAsync("GitHub", req.GitHubUrl, cts.Token));
-
             var results = await Task.WhenAll(tasks);
             foreach (var (label, content) in results)
             {
                 if (!string.IsNullOrEmpty(content))
+                {
+                    onProgress?.Invoke($"✓ Successfully fetched context from {label}.");
                     sb.AppendLine($"{label}: {content}");
+                }
+                else
+                {
+                    onProgress?.Invoke($"⚠ No usable content from {label}.");
+                }
             }
         }
         catch (OperationCanceledException)
         {
             logger.LogWarning("Context gathering timed out — proceeding with form data only.");
+            onProgress?.Invoke("⚠ Context gathering timed out or was canceled.");
         }
 
         return sb.ToString();
@@ -324,7 +342,7 @@ public class GeminiService(
         }
     }
 
-    private async Task<GeminiResponseDto?> CallGeminiAsync(string prompt, string modelName)
+    private async Task<GeminiResponseDto?> CallGeminiAsync(string prompt, string modelName, CancellationToken ct = default)
     {
         var normalizedModel = modelName.StartsWith("models/") ? modelName : $"models/{modelName}";
         var url = $"https://generativelanguage.googleapis.com/v1beta/{normalizedModel}:generateContent?key={_apiKey}";
@@ -337,7 +355,8 @@ public class GeminiService(
 
         logger.LogInformation("Calling Gemini model '{Model}' for content generation...", modelName);
         
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(45));
         var response = await http.PostAsJsonAsync(url, payload, cts.Token);
         if (!response.IsSuccessStatusCode)
         {
