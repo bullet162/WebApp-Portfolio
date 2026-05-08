@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject AdminAuthService Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Admin Login</PageTitle>
 
@@ -20,6 +21,10 @@
             <div class="form-group">
                 <label>Password</label>
                 <InputText @bind-Value="model.Password" type="password" class="form-control" />
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <InputCheckbox @bind-Value="model.RememberMe" id="rememberMe" />
+                <label for="rememberMe" style="margin-bottom: 0; cursor: pointer; font-size: 0.9rem; opacity: 0.8;">Remember this device</label>
             </div>
             <button type="submit" class="btn-primary" style="width:100%" disabled="@(loading || lockedOut)">
                 @(loading ? "Logging in..." : "Login")
@@ -48,6 +53,26 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !Auth.IsAuthenticated)
+        {
+            try 
+            {
+                var token = await JS.InvokeAsync<string?>("localStorage.getItem", "admin_auth_token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    if (await Auth.TryAutoLoginAsync(token))
+                    {
+                        StateHasChanged();
+                        Nav.NavigateTo("/admin");
+                    }
+                }
+            }
+            catch { /* Ignore JS errors during pre-rendering */ }
+        }
+    }
+
     async Task DoLogin()
     {
         if (Auth.IsLockedOut(AttemptKey))
@@ -61,8 +86,16 @@
         loading = true;
         error = null;
 
-        if (await Auth.LoginAsync(model.Username, model.Password, AttemptKey))
+        var result = await Auth.LoginAsync(model.Username, model.Password, model.RememberMe, AttemptKey);
+        
+        if (result.success)
+        {
+            if (model.RememberMe && !string.IsNullOrEmpty(result.token))
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", "admin_auth_token", result.token);
+            }
             Nav.NavigateTo("/admin");
+        }
         else
         {
             if (Auth.IsLockedOut(AttemptKey))
@@ -81,5 +114,6 @@
     {
         public string Username { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
     }
 }
