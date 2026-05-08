@@ -98,12 +98,14 @@ else
 @if (selected is not null)
 {
     <div class="modal-backdrop" @onclick="CloseModal">
-        <div class="modal-box" @onclick:stopPropagation style="max-width: 800px;">
+        <div class="compact-modal" @onclick:stopPropagation>
             <div class="modal-header">
                 <div>
-                    <h3>Edit Developer Profile</h3>
-                    <span class="modal-meta">Submitted @selected.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
-                    <span class="status-badge status-@selected.Status.ToString().ToLower()">@selected.Status</span>
+                    <h3 style="margin: 0; font-size: 1.25rem;">Edit Developer Profile</h3>
+                    <div style="margin-top: 0.25rem;">
+                        <span class="modal-meta" style="font-size: 0.8rem;">Submitted @selected.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</span>
+                        <span class="status-badge status-@selected.Status.ToString().ToLower()" style="font-size: 0.75rem; padding: 0.15rem 0.4rem; margin-left: 0.5rem;">@selected.Status</span>
+                    </div>
                 </div>
                 <button class="modal-close" @onclick="CloseModal">&times;</button>
             </div>
