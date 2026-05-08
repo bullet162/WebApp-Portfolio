@@ -1,5 +1,6 @@
 @page "/"
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
 @inject ContentService Svc
 @inject CacheService Cache
 @inject GitHubService GitHub
@@ -519,6 +520,7 @@
                     }
                 </div>
             </div>
+        </div>
     </div>
 </section>
 
@@ -530,9 +532,7 @@
 </footer>
 
 @code {
-    using System.ComponentModel.DataAnnotations;
-
-    public class ContactMessageModel
+    private class ContactMessageModel
     {
         [Required(ErrorMessage = "Name is required")]
         public string Name { get; set; } = "";
