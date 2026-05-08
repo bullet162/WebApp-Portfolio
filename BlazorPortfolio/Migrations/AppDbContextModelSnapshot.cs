@@ -38,6 +38,12 @@ namespace BlazorPortfolio.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("PersistentToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PersistentTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("text");
