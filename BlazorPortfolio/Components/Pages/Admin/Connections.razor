@@ -4,6 +4,7 @@
 @inject ContentService Svc
 @inject GeminiService Gemini
 @inject IConfiguration Config
+@inject IJSRuntime JS
 @using BlazorPortfolio.Models
 @using System.Text.Json
 
@@ -406,11 +407,17 @@ else
         StateHasChanged();
         try
         {
-            var res = await Gemini.EnrichProfileAsync(selected);
+            await JS.InvokeVoidAsync("console.log", "[AI]: Started enrichment process...");
+            var res = await Gemini.EnrichProfileAsync(selected, msg => 
+            {
+                InvokeAsync(() => JS.InvokeVoidAsync("console.log", $"[AI]: {msg}"));
+            });
+            
             if (!enrichCts.Token.IsCancellationRequested)
             {
                 await Svc.SaveEnrichmentAsync(res);
                 enrichment = res;
+                await JS.InvokeVoidAsync("console.log", $"[AI]: Enrichment finished with status: {res.Status}");
             }
         }
         catch (OperationCanceledException)
