@@ -71,9 +71,8 @@ public class GeminiService(
             onProgress?.Invoke($"Context gathered. Built {prompt.Length}-char prompt. Getting models...");
 
             // 3. Call Gemini with Fallbacks
-            var modelsToTry = await GetModelsToTryAsync();
-            logger.LogInformation("Enrichment: trying {Count} models: {Models}", modelsToTry.Count, string.Join(", ", modelsToTry.Take(3)));
-            onProgress?.Invoke($"Found {modelsToTry.Count} fallback models. Starting generation...");
+            var modelsToTry = await GetModelsToTryAsync(onProgress);
+            onProgress?.Invoke($"Starting generation with {modelsToTry.Count} possible models...");
             GeminiResponseDto? result = null;
             string? errorMsg = null;
             
@@ -103,8 +102,9 @@ public class GeminiService(
                 }
                 catch (Exception ex)
                 {
+                    var msg = ex.Message.Length > 150 ? ex.Message.Substring(0, 150) + "..." : ex.Message;
+                    onProgress?.Invoke($"Model {model} failed unexpectedly: {msg}");
                     logger.LogWarning(ex, "Gemini model '{Model}' failed unexpectedly. Trying next fallback...", model);
-                    // Continue to next model
                 }
             }
             
@@ -250,39 +250,59 @@ public class GeminiService(
         """;
     }
 
-    private async Task<List<string>> GetModelsToTryAsync()
+    private async Task<List<string>> GetModelsToTryAsync(Action<string>? onProgress = null)
     {
+        var models = new List<string>();
         var normalizedConfigured = _model.Replace("models/", "");
         
-        // Hardcoded priority sequence
-        var priorityList = new List<string>
-        {
-            normalizedConfigured,
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro"
-        };
+        // 1. Always try the configured model first
+        models.Add(normalizedConfigured);
         
-        // Ensure no duplicates if configured model is in the default list
-        var models = priorityList.Distinct().ToList();
-        
+        // 2. Discover ALL available models via API
         if (_enableModelDiscovery)
         {
-            var discovered = await GetAvailableGenerateContentModelsAsync();
-            if (discovered != null && discovered.Any())
+            try 
             {
-                foreach (var d in discovered)
+                var discovered = await GetAvailableGenerateContentModelsAsync();
+                if (discovered != null && discovered.Any())
                 {
-                    if (!models.Contains(d))
+                    onProgress?.Invoke($"✓ Discovered {discovered.Count} models via API. Prioritizing best versions...");
+                    
+                    // Sort discovered models: 2.0 > 1.5-flash > 1.5-pro > others
+                    var sorted = discovered
+                        .OrderByDescending(m => m == normalizedConfigured)
+                        .ThenByDescending(m => m.Contains("2.0"))
+                        .ThenByDescending(m => m.Contains("flash") && !m.Contains("exp") && !m.Contains("preview"))
+                        .ThenByDescending(m => m.Contains("pro") && !m.Contains("exp") && !m.Contains("preview"))
+                        .ToList();
+
+                    foreach (var d in sorted)
                     {
-                        models.Add(d);
+                        if (!models.Contains(d)) models.Add(d);
                     }
                 }
+                else
+                {
+                    onProgress?.Invoke("⚠ No models found via API discovery.");
+                }
+            }
+            catch (Exception ex)
+            {
+                onProgress?.Invoke($"⚠ Discovery failed: {ex.Message.Substring(0, Math.Min(ex.Message.Length, 60))}...");
             }
         }
+
+        // 3. Hardcoded safe fallbacks if discovery is empty or disabled
+        var safeFallbacks = new[] { "gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro" };
+        foreach (var f in safeFallbacks)
+        {
+            if (!models.Contains(f)) models.Add(f);
+        }
         
-        return models.Take(_maxModelFallbackAttempts).ToList();
+        // Limit to max attempts to avoid infinite looping
+        var finalSelection = models.Distinct().Take(_maxModelFallbackAttempts).ToList();
+        logger.LogInformation("Enrichment fallback chain: {Models}", string.Join(" -> ", finalSelection));
+        return finalSelection;
     }
 
     public async Task<List<string>?> GetAvailableGenerateContentModelsAsync(bool forceRefresh = false)
