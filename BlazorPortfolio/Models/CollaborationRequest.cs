@@ -32,4 +32,57 @@ public class CollaborationRequest
     public CollaborationStatus Status { get; set; } = CollaborationStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAt { get; set; }
+
+    // --- Developer Network Additions ---
+    
+    public bool IsVisible { get; set; } = true;
+    public bool IsFeatured { get; set; } = false;
+    public bool IsVerified { get; set; } = false;
+    public bool OpenToCollaborate { get; set; } = false;
+    
+    [MaxLength(100)]
+    public string? PublicSlug { get; set; }
+    
+    [MaxLength(100)]
+    public string? RoleTitle { get; set; }
+    
+    [MaxLength(50)]
+    public string? ConnectionType { get; set; }
+    
+    [MaxLength(200)]
+    public string? Tags { get; set; }
+    
+    [MaxLength(500)]
+    public string? GitHubUrl { get; set; }
+    
+    [MaxLength(500)]
+    public string? LinkedInUrl { get; set; }
+    
+    public int DisplayOrder { get; set; }
+    
+    public bool AiEnrichmentConsent { get; set; }
+    public DateTime? AiEnrichmentConsentAt { get; set; }
+    public DateTime? LastAiEnrichmentAt { get; set; }
+    
+    [MaxLength(255)]
+    public string? EditTokenHash { get; set; }
+    public DateTime? EditTokenExpiresAt { get; set; }
+    public DateTime? EditTokenUsedAt { get; set; }
+    public DateTime? LastEditRequestedAt { get; set; }
+    public DateTime? LastEditedAt { get; set; }
+    
+    public bool BadgeEnabled { get; set; }
+    public bool ReciprocalLinkVerified { get; set; }
+    public DateTime? ReciprocalLinkVerifiedAt { get; set; }
+    public DateTime? ReciprocalLinkLastCheckedAt { get; set; }
+    
+    [MaxLength(500)]
+    public string? ReciprocalLinkCheckError { get; set; }
+    
+    [MaxLength(100)]
+    public string? ReviewedBy { get; set; }
+    
+    public string? ReviewNote { get; set; }
+    
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
