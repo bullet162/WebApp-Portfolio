@@ -15,13 +15,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<CollaborationRequest> CollaborationRequests => Set<CollaborationRequest>();
+    public DbSet<DeveloperNetworkProfileRevision> DeveloperNetworkProfileRevisions => Set<DeveloperNetworkProfileRevision>();
+    public DbSet<DeveloperProfileEnrichment> DeveloperProfileEnrichments => Set<DeveloperProfileEnrichment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Seed some default data so the portfolio isn't empty on first run
         modelBuilder.Entity<Experience>().HasData(
-            new Experience { Id = 1, Title = "Senior Developer", Company = "Acme Corp", Period = "2022 - Present", Description = "Led development of cloud-native applications.", SortOrder = 1 },
-            new Experience { Id = 2, Title = "Full Stack Developer", Company = "Startup Inc", Period = "2019 - 2022", Description = "Built and maintained web applications using .NET and React.", SortOrder = 2 }
+            new Experience { Id = 1, Title = "Software Developer", Company = "Professional Experience", Period = "2022 - Present", Description = "Developing scalable web solutions and backend systems.", SortOrder = 1 },
+            new Experience { Id = 2, Title = "Full Stack Developer", Company = "Freelance / Open Source", Period = "2019 - 2022", Description = "Built and maintained high-performance web applications using .NET and modern frameworks.", SortOrder = 2 }
         );
 
         modelBuilder.Entity<Skill>().HasData(
@@ -32,21 +34,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         );
 
         modelBuilder.Entity<Project>().HasData(
-            new Project { Id = 1, Title = "Portfolio CMS", Description = "This very portfolio, built with Blazor and EF Core.", TechStack = "Blazor, EF Core, SQLite", SortOrder = 1 }
+            new Project { Id = 1, Title = "Portfolio CMS", Description = "Problem: Building a personal brand that is easy to manage. Solution: A custom-built CMS and portfolio. Tech: Blazor Server, EF Core, Neon PostgreSQL. Result: A professional, dynamic portfolio.", TechStack = "Blazor, EF Core, PostgreSQL", SortOrder = 1 }
         );
 
         modelBuilder.Entity<SiteProfile>().HasData(
             new SiteProfile
             {
                 Id = 1,
-                OwnerName = "Your Name",
+                OwnerName = "Jherson Aguto",
                 Tagline = "Full Stack Developer · .NET · Blazor · Cloud",
                 Eyebrow = "👋 Welcome to my portfolio",
                 HeroCta = "Hire Me",
                 HeroSecondaryCta = "View Projects",
                 ContactBlurb = "Have an opportunity or just want to say hi? Fill out the form and I'll get back to you.",
-                Email = "hello@example.com",
-                Location = "Your City, Country"
+                Email = "hello@jhersonaguto.dev",
+                Location = "Philippines"
             }
         );
     }
