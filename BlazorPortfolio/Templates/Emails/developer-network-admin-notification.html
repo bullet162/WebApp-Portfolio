@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Connection Request</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #1e293b; border-radius: 12px; overflow: hidden;">
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="color: #ffffff; margin: 0 0 20px 0;">New Developer Network Request</h2>
+                            <div style="background-color: #334155; padding: 24px; border-radius: 8px; margin-bottom: 30px;">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td width="35%" style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 8px 0; border-bottom: 1px solid #475569;">NAME</td>
+                                        <td style="color: #ffffff; font-size: 15px; padding: 8px 0; border-bottom: 1px solid #475569;">{{DeveloperName}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 8px 0; border-bottom: 1px solid #475569;">ROLE</td>
+                                        <td style="color: #ffffff; font-size: 15px; padding: 8px 0; border-bottom: 1px solid #475569;">{{RoleTitle}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 8px 0; border-bottom: 1px solid #475569;">EMAIL</td>
+                                        <td style="color: #ffffff; font-size: 15px; padding: 8px 0; border-bottom: 1px solid #475569;">{{Email}}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 8px 0; border-bottom: 1px solid #475569;">PORTFOLIO</td>
+                                        <td style="color: #ffffff; font-size: 15px; padding: 8px 0; border-bottom: 1px solid #475569;"><a href="{{PortfolioUrl}}" style="color: #00e5ff; text-decoration: none;">View Portfolio ↗</a></td>
+                                    </tr>
+                                    @if (!string.IsNullOrEmpty("{{GitHubUrl}}")) {
+                                    <tr>
+                                        <td style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 8px 0; border-bottom: 1px solid #475569;">GITHUB</td>
+                                        <td style="color: #ffffff; font-size: 15px; padding: 8px 0; border-bottom: 1px solid #475569;"><a href="{{GitHubUrl}}" style="color: #00e5ff; text-decoration: none;">{{GitHubUrl}}</a></td>
+                                    </tr>
+                                    }
+                                    <tr>
+                                        <td style="color: #94a3b8; font-size: 13px; font-weight: 600; padding: 12px 0 4px 0;">MESSAGE</td>
+                                        <td style="color: #cbd5e1; font-size: 14px; line-height: 1.5; padding: 12px 0 4px 0;">{{Message}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <table border="0" cellspacing="0" cellpadding="0" style="margin: auto;">
+                                <tr>
+                                    <td align="center" style="border-radius: 6px;" bgcolor="#00e5ff">
+                                        <a href="{{AdminUrl}}" target="_blank" style="font-size: 16px; color: #0f172a; text-decoration: none; border-radius: 6px; padding: 12px 40px; display: inline-block; font-weight: bold;">Review Request</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

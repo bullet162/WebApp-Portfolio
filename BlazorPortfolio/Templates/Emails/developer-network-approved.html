@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval Notification</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding: 40px 40px 10px 40px;">
+                            <div style="font-size: 48px; margin-bottom: 20px;">✨</div>
+                            <h1 style="color: #ffffff; font-size: 28px; margin: 0; font-weight: bold;">You're In!</h1>
+                            <p style="color: #00e5ff; font-size: 14px; margin: 8px 0 0 0; font-weight: 600; text-transform: uppercase; letter-spacing: 2px;">Developer Network</p>
+                        </td>
+                    </tr>
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 30px 40px 40px 40px;">
+                            <p style="color: #cbd5e1; font-size: 18px; line-height: 1.6; text-align: center; margin-bottom: 30px;">
+                                Congratulations <strong>{{DeveloperName}}</strong>! Your profile has been approved and is now live on my portfolio.
+                            </p>
+                            <div style="background-color: rgba(0, 229, 255, 0.1); border-left: 4px solid #00e5ff; padding: 20px; border-radius: 4px; margin-bottom: 30px;">
+                                <p style="color: #ffffff; font-size: 15px; margin: 0; font-weight: bold;">Your Public Profile</p>
+                                <p style="color: #00e5ff; font-size: 14px; margin: 4px 0 0 0; word-break: break-all;">{{ProfileUrl}}</p>
+                            </div>
+                            <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 30px;">
+                                You can now share your status as a connected developer. Log in to your profile to copy your personalized animated badge for your own portfolio.
+                            </p>
+                            <table border="0" cellspacing="0" cellpadding="0" style="margin: auto;">
+                                <tr>
+                                    <td align="center" style="border-radius: 6px;" bgcolor="#00e5ff">
+                                        <a href="{{ProfileUrl}}" target="_blank" style="font-size: 16px; color: #0f172a; text-decoration: none; border-radius: 6px; padding: 14px 40px; display: inline-block; font-weight: bold;">View Your Profile</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #94a3b8; font-size: 13px; text-align: center; margin-top: 40px;">
+                                Need to make updates? Just submit a new request at <a href="{{NetworkUrl}}" style="color: #00e5ff;">jhersonaguto.dev</a>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
