@@ -1,0 +1,174 @@
+@page "/network/{slug}"
+@using BlazorPortfolio.Models
+@using BlazorPortfolio.Services
+@inject ContentService Svc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@(peer?.FirstName ?? "Developer Profile") | Jherson Aguto Developer Network</PageTitle>
+
+<div class="section">
+    <div class="container">
+        @if (peer == null)
+        {
+            <div class="empty-state text-center anim-fade">
+                <div class="section-tag mb-3">404</div>
+                <h2>Profile Not Found</h2>
+                <p class="text-muted mb-4">The profile you are looking for does not exist or is no longer public.</p>
+                <a href="/#network" class="btn-outline">← Back to Developer Network</a>
+            </div>
+        }
+        else
+        {
+            <div class="profile-page anim-slide">
+                <div class="row">
+                    <!-- Left Column: Profile Info -->
+                    <div class="col-lg-8">
+                        <div class="profile-card">
+                            <div class="profile-header">
+                                <div class="profile-badges">
+                                    @if (peer.IsFeatured) { <span class="badge-featured" title="Featured Member">⭐ Featured</span> }
+                                    @if (peer.IsVerified) { <span class="badge-verified" title="Verified Profile">✅ Verified</span> }
+                                    @if (peer.OpenToCollaborate) { <span class="badge-open" title="Open to Collaborate">🤝 Open to Collaborate</span> }
+                                </div>
+                                <h1 class="display-name">@peer.FirstName @peer.LastName</h1>
+                                <p class="profile-role">@peer.RoleTitle</p>
+                                <div class="profile-meta">
+                                    <span class="meta-item"><i class="lucide-icon" data-lucide="users"></i> @peer.ConnectionType</span>
+                                    @if (peer.ReciprocalLinkVerified)
+                                    {
+                                        <span class="meta-item text-cyan"><i class="lucide-icon" data-lucide="link"></i> Partner Network</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="profile-body">
+                                <section class="profile-section">
+                                    <h3>About</h3>
+                                    <p class="profile-bio">@peer.Message</p>
+                                </section>
+
+                                @if (!string.IsNullOrEmpty(peer.Tags))
+                                {
+                                    <section class="profile-section">
+                                        <h3>Skills & Expertise</h3>
+                                        <div class="tech-tags">
+                                            @foreach (var tag in peer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                                            {
+                                                <span class="tech-tag">@tag.Trim()</span>
+                                            }
+                                        </div>
+                                    </section>
+                                }
+
+                                <section class="profile-section">
+                                    <h3>Public Links</h3>
+                                    <div class="social-links-grid">
+                                        @if (!string.IsNullOrEmpty(peer.PortfolioUrl))
+                                        {
+                                            <a href="@peer.PortfolioUrl" target="_blank" rel="noopener noreferrer" class="social-card portfolio-link">
+                                                <div class="social-icon"><i class="lucide-icon" data-lucide="globe"></i></div>
+                                                <div class="social-text">
+                                                    <strong>Portfolio</strong>
+                                                    <span>View personal work</span>
+                                                </div>
+                                            </a>
+                                        }
+                                        @if (!string.IsNullOrEmpty(peer.GitHubUrl))
+                                        {
+                                            <a href="@peer.GitHubUrl" target="_blank" rel="noopener noreferrer" class="social-card github-link">
+                                                <div class="social-icon"><i class="lucide-icon" data-lucide="github"></i></div>
+                                                <div class="social-text">
+                                                    <strong>GitHub</strong>
+                                                    <span>Explore repositories</span>
+                                                </div>
+                                            </a>
+                                        }
+                                        @if (!string.IsNullOrEmpty(peer.LinkedInUrl))
+                                        {
+                                            <a href="@peer.LinkedInUrl" target="_blank" rel="noopener noreferrer" class="social-card linkedin-link">
+                                                <div class="social-icon"><i class="lucide-icon" data-lucide="linkedin"></i></div>
+                                                <div class="social-text">
+                                                    <strong>LinkedIn</strong>
+                                                    <span>Connect professionally</span>
+                                                </div>
+                                            </a>
+                                        }
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Network Badge -->
+                    <div class="col-lg-4">
+                        <div class="sticky-sidebar">
+                            <div class="network-badge-box">
+                                <h4 class="mb-3">Personalized Badge</h4>
+                                <p class="text-sm text-muted mb-4">Show your connection to the network on your own portfolio.</p>
+                                
+                                <div class="badge-preview-container mb-4">
+                                    <div class="collab-badge badge-@(peer.PublicSlug?.GetHashCode() % 5 ?? 0)">
+                                        Connected with Jherson Aguto
+                                    </div>
+                                </div>
+
+                                <div class="snippet-box">
+                                    <div class="snippet-header">
+                                        <span>HTML Snippet</span>
+                                        <button class="btn-copy" @onclick="CopySnippet">Copy</button>
+                                    </div>
+                                    <pre id="badge-snippet">@badgeSnippet</pre>
+                                </div>
+
+                                <div class="alert-info mt-4" style="font-size: 0.85rem;">
+                                    <p class="mb-0"><strong>Tip:</strong> Adding this badge to your portfolio helps verify our collaboration and improves network visibility.</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 text-center">
+                                <a href="/#network" class="btn-outline w-100">← All Developers</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? slug { get; set; }
+    private CollaborationRequest? peer;
+    private string badgeSnippet = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(slug))
+        {
+            Nav.NavigateTo("/network");
+            return;
+        }
+
+        peer = await Svc.GetDeveloperProfileBySlugAsync(slug);
+
+        if (peer != null)
+        {
+            var profileUrl = $"{Nav.BaseUri}network/{peer.PublicSlug}";
+            badgeSnippet = $"<a href=\"{profileUrl}\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"text-decoration:none;\">\n  <div style=\"padding:10px 20px; background:linear-gradient(135deg, #00e5ff 0%, #1200ff 100%); color:white; border-radius:8px; font-weight:bold; font-family:sans-serif; display:inline-block;\">\n    Connected with Jherson Aguto Developer Network\n  </div>\n</a>";
+        }
+    }
+
+    private async Task CopySnippet()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", badgeSnippet);
+            // We could add a "Copied!" toast here
+        }
+        catch
+        {
+            // Fallback for older browsers if needed
+        }
+    }
+}
