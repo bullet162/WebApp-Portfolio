@@ -197,16 +197,20 @@
                         
                         @if (!string.IsNullOrEmpty(selectedPeer.PublicSlug))
                         {
+                            <div style="margin-bottom: 1.5rem;">
+                                <a href="/network/@selectedPeer.PublicSlug" class="btn-outline" style="width: 100%; display: block; text-align: center; font-weight: 600;">View Full Developer Profile ↗</a>
+                            </div>
+
                             <div class="badge-snippet-box" style="background: var(--dark2); border-radius: 8px; padding: 1.25rem; border: 1px solid var(--border);">
                                 <label style="display: block; font-weight: 600; margin-bottom: 0.25rem;">Developer Badge Snippet</label>
                                 <p class="field-hint" style="margin-bottom: 1rem;">Embed this badge on your portfolio or GitHub profile to show your network connection.</p>
                                 
                                 <div style="display: flex; justify-content: center; margin-bottom: 1.25rem; padding: 1rem; background: var(--dark); border-radius: 6px;">
-                                    <img src="https://img.shields.io/badge/Jherson_Aguto-Developer_Network-7c6fff?style=for-the-badge" alt="Jherson Aguto Developer Network Badge" />
+                                    <img src="https://img.shields.io/badge/@(selectedPeer.FirstName)_@(selectedPeer.LastName)-Developer_Network-7c6fff?style=for-the-badge" alt="@selectedPeer.FirstName @selectedPeer.LastName Developer Network Badge" />
                                 </div>
 
                                 <div class="code-preview" style="background: var(--dark); border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem; overflow-x: auto;">
-                                    <code style="font-size: 0.85rem; color: var(--cyan);">&lt;a href="https://jhersonaguto.dev/network/@selectedPeer.PublicSlug" target="_blank" rel="noopener noreferrer"&gt;&lt;img src="https://img.shields.io/badge/Jherson_Aguto-Developer_Network-7c6fff?style=for-the-badge" alt="Jherson Aguto Developer Network Badge" /&gt;&lt;/a&gt;</code>
+                                    <code style="font-size: 0.85rem; color: var(--cyan);">&lt;a href="https://jhersonaguto.dev/network/@selectedPeer.PublicSlug" target="_blank" rel="noopener noreferrer"&gt;&lt;img src="https://img.shields.io/badge/@(selectedPeer.FirstName)_@(selectedPeer.LastName)-Developer_Network-7c6fff?style=for-the-badge" alt="@selectedPeer.FirstName @selectedPeer.LastName Developer Network Badge" /&gt;&lt;/a&gt;</code>
                                 </div>
                             </div>
                         }
