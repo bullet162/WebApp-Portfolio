@@ -26,7 +26,7 @@ public class GeminiService(
     private readonly int _maxModelFallbackAttempts = config.GetValue<int>("Gemini:MaxModelFallbackAttempts", 5);
 
 
-    public async Task<DeveloperProfileEnrichment> EnrichProfileAsync(CollaborationRequest req)
+    public async Task<DeveloperProfileEnrichment> EnrichProfileAsync(CollaborationRequest req, Action<string>? onProgress = null)
     {
         var enrichment = new DeveloperProfileEnrichment
         {
@@ -61,15 +61,18 @@ public class GeminiService(
         {
             // 1. Gather context from public links
             logger.LogInformation("Enrichment: gathering context from URLs...");
+            onProgress?.Invoke("Gathering context from Portfolio & GitHub URLs...");
             var context = await GatherContextAsync(req);
             
             // 2. Build Prompt
             var prompt = BuildPrompt(req, context);
             logger.LogInformation("Enrichment: prompt built ({Len} chars). Getting models...", prompt.Length);
+            onProgress?.Invoke($"Context gathered. Built {prompt.Length}-char prompt. Getting models...");
 
             // 3. Call Gemini with Fallbacks
             var modelsToTry = await GetModelsToTryAsync();
             logger.LogInformation("Enrichment: trying {Count} models: {Models}", modelsToTry.Count, string.Join(", ", modelsToTry.Take(3)));
+            onProgress?.Invoke($"Found {modelsToTry.Count} fallback models. Starting generation...");
             GeminiResponseDto? result = null;
             string? errorMsg = null;
             
@@ -77,6 +80,7 @@ public class GeminiService(
             {
                 try
                 {
+                    onProgress?.Invoke($"Calling model: {model}...");
                     result = await CallGeminiAsync(prompt, model);
                     if (result != null)
                     {
@@ -106,6 +110,7 @@ public class GeminiService(
             {
                 enrichment.Status = EnrichmentStatus.Failed;
                 enrichment.ErrorMessage = errorMsg ?? "AI enrichment failed after trying available Gemini text-generation models. Check API key, quota, or model availability.";
+                onProgress?.Invoke("FAILED: " + enrichment.ErrorMessage);
             }
             else
             {
@@ -326,7 +331,7 @@ public class GeminiService(
         var payload = new
         {
             contents = new[] { new { parts = new[] { new { text = prompt } } } },
-            generationConfig = new { response_mime_type = "application/json", max_output_tokens = 1024 }
+            generationConfig = new { responseMimeType = "application/json", maxOutputTokens = 1024 }
         };
 
         logger.LogInformation("Calling Gemini model '{Model}' for content generation...", modelName);
