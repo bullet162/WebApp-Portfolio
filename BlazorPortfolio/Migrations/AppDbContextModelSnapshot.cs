@@ -55,7 +55,33 @@ namespace BlazorPortfolio.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AiEnrichmentConsent")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("AiEnrichmentConsentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("BadgeEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ConnectionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("EditTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EditTokenHash")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("EditTokenUsedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
@@ -67,28 +93,233 @@ namespace BlazorPortfolio.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("GitHubUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastAiEnrichmentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastEditRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastEditedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("LinkedInUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("OpenToCollaborate")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("PortfolioUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("PublicSlug")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ReciprocalLinkCheckError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ReciprocalLinkLastCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ReciprocalLinkVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ReciprocalLinkVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewNote")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RoleTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CollaborationRequests");
+                });
+
+            modelBuilder.Entity("BlazorPortfolio.Models.DeveloperNetworkProfileRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CollaborationRequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProposedConnectionType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProposedFirstName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProposedGitHubUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProposedLastName")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProposedLinkedInUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProposedMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool?>("ProposedOpenToCollaborate")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProposedPortfolioUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProposedRoleTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProposedTags")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CollaborationRequestId");
+
+                    b.ToTable("DeveloperNetworkProfileRevisions");
+                });
+
+            modelBuilder.Entity("BlazorPortfolio.Models.DeveloperProfileEnrichment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ApprovedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("CollaborationRequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("ConfidenceScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GeneratedCollaborationInterestsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GeneratedHeadline")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GeneratedProjectHighlightsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GeneratedSkillsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GeneratedSummary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ModelUsed")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PromptVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceCitationsJson")
+                        .HasColumnType("text");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("CollaborationRequests");
+                    b.HasIndex("CollaborationRequestId");
+
+                    b.ToTable("DeveloperProfileEnrichments");
                 });
 
             modelBuilder.Entity("BlazorPortfolio.Models.Experience", b =>
@@ -126,17 +357,17 @@ namespace BlazorPortfolio.Migrations
                         new
                         {
                             Id = 1,
-                            Company = "Acme Corp",
-                            Description = "Led development of cloud-native applications.",
+                            Company = "Professional Experience",
+                            Description = "Developing scalable web solutions and backend systems.",
                             Period = "2022 - Present",
                             SortOrder = 1,
-                            Title = "Senior Developer"
+                            Title = "Software Developer"
                         },
                         new
                         {
                             Id = 2,
-                            Company = "Startup Inc",
-                            Description = "Built and maintained web applications using .NET and React.",
+                            Company = "Freelance / Open Source",
+                            Description = "Built and maintained high-performance web applications using .NET and modern frameworks.",
                             Period = "2019 - 2022",
                             SortOrder = 2,
                             Title = "Full Stack Developer"
@@ -239,9 +470,9 @@ namespace BlazorPortfolio.Migrations
                         new
                         {
                             Id = 1,
-                            Description = "This very portfolio, built with Blazor and EF Core.",
+                            Description = "Problem: Building a personal brand that is easy to manage. Solution: A custom-built CMS and portfolio. Tech: Blazor Server, EF Core, Neon PostgreSQL. Result: A professional, dynamic portfolio.",
                             SortOrder = 1,
-                            TechStack = "Blazor, EF Core, SQLite",
+                            TechStack = "Blazor, EF Core, PostgreSQL",
                             Title = "Portfolio CMS"
                         });
                 });
@@ -311,12 +542,12 @@ namespace BlazorPortfolio.Migrations
                         {
                             Id = 1,
                             ContactBlurb = "Have an opportunity or just want to say hi? Fill out the form and I'll get back to you.",
-                            Email = "hello@example.com",
+                            Email = "hello@jhersonaguto.dev",
                             Eyebrow = "👋 Welcome to my portfolio",
                             HeroCta = "Hire Me",
                             HeroSecondaryCta = "View Projects",
-                            Location = "Your City, Country",
-                            OwnerName = "Your Name",
+                            Location = "Philippines",
+                            OwnerName = "Jherson Aguto",
                             Tagline = "Full Stack Developer · .NET · Blazor · Cloud"
                         });
                 });
@@ -392,6 +623,28 @@ namespace BlazorPortfolio.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("DataProtectionKeys");
+                });
+
+            modelBuilder.Entity("BlazorPortfolio.Models.DeveloperNetworkProfileRevision", b =>
+                {
+                    b.HasOne("BlazorPortfolio.Models.CollaborationRequest", "CollaborationRequest")
+                        .WithMany()
+                        .HasForeignKey("CollaborationRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CollaborationRequest");
+                });
+
+            modelBuilder.Entity("BlazorPortfolio.Models.DeveloperProfileEnrichment", b =>
+                {
+                    b.HasOne("BlazorPortfolio.Models.CollaborationRequest", "CollaborationRequest")
+                        .WithMany()
+                        .HasForeignKey("CollaborationRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CollaborationRequest");
                 });
 #pragma warning restore 612, 618
         }
