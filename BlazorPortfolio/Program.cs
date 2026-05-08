@@ -67,11 +67,13 @@ builder.Services.AddDataProtection()
     .PersistKeysToDbContext<AppDbContext>()
     .SetApplicationName("BlazorPortfolio");
 
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<ContentService>();
 builder.Services.AddScoped<AdminAuthService>();
 builder.Services.AddScoped<CacheService>();
 builder.Services.AddScoped<GitHubService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<GeminiService>();
 builder.Services.AddHostedService<KeepAliveService>();
 builder.Services.AddHostedService<WarmUpService>();
 
