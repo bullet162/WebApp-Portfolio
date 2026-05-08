@@ -383,7 +383,7 @@ else
         enrichment = await Svc.GetEnrichmentAsync(req.Id);
     }
     
-    void CloseModal() { selected = null; enrichment = null; }
+    void CloseModal() { selected = null; enrichment = null; enrichCts?.Cancel(); }
 
     async Task SaveSelected()
     {
@@ -391,22 +391,36 @@ else
         await Svc.UpdateCollaborationRequestAsync(selected);
         selected = null;
         enrichment = null;
+        enrichCts?.Cancel();
         await Load();
     }
+
+    CancellationTokenSource? enrichCts;
 
     async Task GenerateAiEnrichment()
     {
         if (selected == null || isEnriching) return;
         isEnriching = true;
+        enrichCts?.Cancel();
+        enrichCts = new CancellationTokenSource();
+        StateHasChanged();
         try
         {
             var res = await Gemini.EnrichProfileAsync(selected);
-            await Svc.SaveEnrichmentAsync(res);
-            enrichment = res;
+            if (!enrichCts.Token.IsCancellationRequested)
+            {
+                await Svc.SaveEnrichmentAsync(res);
+                enrichment = res;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // User cancelled — that's fine
         }
         finally
         {
             isEnriching = false;
+            StateHasChanged();
         }
     }
 
