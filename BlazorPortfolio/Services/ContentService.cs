@@ -2,10 +2,11 @@ using BlazorPortfolio.Data;
 using BlazorPortfolio.Models;
 using BlazorPortfolio.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace BlazorPortfolio.Services;
 
-public class ContentService(IDbContextFactory<AppDbContext> factory)
+public class ContentService(IDbContextFactory<AppDbContext> factory, EmailService email, HttpClient http, IMemoryCache cache)
 {
     // ── Experiences ──────────────────────────────────────────────────────────
     public async Task<List<Experience>> GetExperiencesAsync()
@@ -124,10 +125,63 @@ public class ContentService(IDbContextFactory<AppDbContext> factory)
 
     public async Task AddCollaborationRequestAsync(CollaborationRequest req)
     {
-        req.Status = SpamDetectionService.Evaluate(req);
         await using var db = await factory.CreateDbContextAsync();
+
+        // 1. Duplicate Protection (Email within last 10 mins)
+        var recent = await db.CollaborationRequests
+            .AnyAsync(r => r.Email == req.Email && r.CreatedAt > DateTime.UtcNow.AddMinutes(-10));
+        if (recent) return;
+
+        // 2. Input Validation & Trimming
+        req.FirstName = (req.FirstName?.Trim() ?? "");
+        if (req.FirstName.Length > 80) req.FirstName = req.FirstName[..80];
+
+        req.LastName = (req.LastName?.Trim() ?? "");
+        if (req.LastName.Length > 80) req.LastName = req.LastName[..80];
+
+        req.Email = (req.Email?.Trim().ToLowerInvariant() ?? "");
+        if (req.Email.Length > 160) req.Email = req.Email[..160];
+
+        if (req.RoleTitle?.Length > 120) req.RoleTitle = req.RoleTitle[..120];
+        if (req.Message?.Length > 1000) req.Message = req.Message[..1000];
+        
+        // 3. URL Validation & Normalization
+        req.PortfolioUrl = NormalizeAndValidateUrl(req.PortfolioUrl, 500);
+        req.GitHubUrl = NormalizeAndValidateUrl(req.GitHubUrl, 500);
+        req.LinkedInUrl = NormalizeAndValidateUrl(req.LinkedInUrl, 500);
+
+        req.Status = SpamDetectionService.Evaluate(req);
         db.CollaborationRequests.Add(req);
         await db.SaveChangesAsync();
+
+        // Trigger notifications (Fire and forget to avoid blocking UI)
+        _ = email.SendNetworkRequestReceivedAsync(req);
+        _ = email.SendAdminNewRequestAlertAsync(req);
+        
+        cache.Remove("ApprovedCollaborators");
+    }
+
+    private string? NormalizeAndValidateUrl(string? url, int maxLen)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var trimmed = url.Trim();
+        if (trimmed.Length > maxLen) trimmed = trimmed[..maxLen];
+
+        try
+        {
+            if (!trimmed.Contains("://")) trimmed = "https://" + trimmed;
+            var uri = new Uri(trimmed);
+            
+            // Safety: Only http/https
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return null;
+
+            // Block localhost/private IPs if possible (simple check)
+            var host = uri.Host.ToLowerInvariant();
+            if (host == "localhost" || host == "127.0.0.1" || host.StartsWith("192.168.") || host.StartsWith("10.")) return null;
+
+            return uri.ToString();
+        }
+        catch { return null; }
     }
 
     public async Task SetCollaborationStatusAsync(int id, CollaborationStatus newStatus)
@@ -135,6 +189,8 @@ public class ContentService(IDbContextFactory<AppDbContext> factory)
         await using var db = await factory.CreateDbContextAsync();
         var req = await db.CollaborationRequests.FindAsync(id);
         if (req is null) return;
+
+        var oldStatus = req.Status;
 
         // Enforce valid transitions
         bool allowed = (req.Status, newStatus) switch
@@ -152,27 +208,241 @@ public class ContentService(IDbContextFactory<AppDbContext> factory)
 
         req.Status = newStatus;
         req.ReviewedAt = DateTime.UtcNow;
+
+        // Ensure slug exists upon approval
+        if (newStatus == CollaborationStatus.Approved)
+        {
+            await EnsurePublicSlugAsync(db, req);
+        }
+
         await db.SaveChangesAsync();
+
+        // Trigger email notification if status actually changed to something final
+        if (oldStatus != newStatus)
+        {
+            if (newStatus == CollaborationStatus.Approved) _ = email.SendDeveloperApprovedAsync(req);
+            else if (newStatus == CollaborationStatus.Rejected) _ = email.SendDeveloperRejectedAsync(req);
+        }
+
+        cache.Remove("ApprovedCollaborators");
     }
 
     public async Task DeleteCollaborationRequestAsync(int id)
     {
         await using var db = await factory.CreateDbContextAsync();
         await db.CollaborationRequests.Where(r => r.Id == id).ExecuteDeleteAsync();
+        cache.Remove("ApprovedCollaborators");
     }
 
     public async Task<List<CollaborationRequest>> GetApprovedCollaboratorsAsync()
     {
+        if (cache.TryGetValue("ApprovedCollaborators", out List<CollaborationRequest>? cachedList) && cachedList != null)
+        {
+            return cachedList;
+        }
+
         await using var db = await factory.CreateDbContextAsync();
-        var approved = await db.CollaborationRequests
-            .Where(r => r.Status == CollaborationStatus.Approved)
+        var list = await db.CollaborationRequests
+            .Where(r => r.Status == CollaborationStatus.Approved && r.IsVisible)
+            .OrderBy(r => r.DisplayOrder)
+            .ThenByDescending(r => r.ReviewedAt)
             .ToListAsync();
 
-        // Sort by completeness score: portfolio (+1) + message (+1) = max 2
-        return approved
-            .OrderByDescending(r => (string.IsNullOrEmpty(r.PortfolioUrl) ? 0 : 1)
-                                  + (string.IsNullOrEmpty(r.Message) ? 0 : 1))
-            .ThenByDescending(r => r.ReviewedAt)
-            .ToList();
+        // Backfill slugs for existing records if missing
+        bool changed = false;
+        foreach (var req in list.Where(r => string.IsNullOrEmpty(r.PublicSlug)))
+        {
+            await EnsurePublicSlugAsync(db, req);
+            changed = true;
+        }
+
+        if (changed) await db.SaveChangesAsync();
+
+        cache.Set("ApprovedCollaborators", list, TimeSpan.FromMinutes(15));
+        return list;
+    }
+
+    public async Task UpdateCollaborationRequestAsync(CollaborationRequest req)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+
+        // Admin-level Validation & Trimming
+        req.FirstName = req.FirstName?.Trim() ?? "";
+        if (req.FirstName.Length > 80) req.FirstName = req.FirstName[..80];
+
+        req.LastName = req.LastName?.Trim() ?? "";
+        if (req.LastName.Length > 80) req.LastName = req.LastName[..80];
+
+        req.Email = req.Email?.Trim().ToLowerInvariant() ?? "";
+        if (req.Email.Length > 160) req.Email = req.Email[..160];
+
+        if (req.RoleTitle?.Length > 120) req.RoleTitle = req.RoleTitle[..120];
+        if (req.Message?.Length > 1000) req.Message = req.Message[..1000];
+        if (req.ReviewNote?.Length > 2000) req.ReviewNote = req.ReviewNote[..2000];
+        if (req.Tags?.Length > 300) req.Tags = req.Tags[..300];
+
+        req.PortfolioUrl = NormalizeAndValidateUrl(req.PortfolioUrl, 500);
+        req.GitHubUrl = NormalizeAndValidateUrl(req.GitHubUrl, 500);
+        req.LinkedInUrl = NormalizeAndValidateUrl(req.LinkedInUrl, 500);
+        
+        // Track status change for email
+        var existing = await db.CollaborationRequests.AsNoTracking().FirstOrDefaultAsync(r => r.Id == req.Id);
+        var statusChangedToApproved = existing != null && existing.Status != CollaborationStatus.Approved && req.Status == CollaborationStatus.Approved;
+        var statusChangedToRejected = existing != null && existing.Status != CollaborationStatus.Rejected && req.Status == CollaborationStatus.Rejected;
+
+        // Ensure slug safety if it was changed or missing
+        if (string.IsNullOrWhiteSpace(req.PublicSlug))
+        {
+            await EnsurePublicSlugAsync(db, req);
+        }
+        else
+        {
+            // Normalize the slug provided by admin
+            req.PublicSlug = NormalizeSlug(req.PublicSlug);
+            
+            // Handle duplicates
+            var baseSlug = req.PublicSlug;
+            int counter = 1;
+            while (await db.CollaborationRequests.AnyAsync(r => r.PublicSlug == req.PublicSlug && r.Id != req.Id))
+            {
+                counter++;
+                req.PublicSlug = $"{baseSlug}-{counter}";
+            }
+        }
+
+        req.UpdatedAt = DateTime.UtcNow;
+        db.CollaborationRequests.Update(req);
+        await db.SaveChangesAsync();
+
+        // Trigger emails if needed
+        if (statusChangedToApproved) _ = email.SendDeveloperApprovedAsync(req);
+        else if (statusChangedToRejected) _ = email.SendDeveloperRejectedAsync(req);
+
+        cache.Remove("ApprovedCollaborators");
+    }
+
+    public async Task<DeveloperProfileEnrichment?> GetEnrichmentAsync(int requestId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.DeveloperProfileEnrichments
+            .FirstOrDefaultAsync(e => e.CollaborationRequestId == requestId);
+    }
+
+    public async Task<CollaborationRequest?> GetDeveloperProfileBySlugAsync(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug)) return null;
+
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.CollaborationRequests
+            .FirstOrDefaultAsync(r => r.PublicSlug == slug && 
+                                     r.Status == CollaborationStatus.Approved && 
+                                     r.IsVisible);
+    }
+
+    public async Task VerifyReciprocalLinkAsync(int requestId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var req = await db.CollaborationRequests.FindAsync(requestId);
+        if (req == null || string.IsNullOrWhiteSpace(req.PortfolioUrl)) return;
+
+        req.ReciprocalLinkLastCheckedAt = DateTime.UtcNow;
+
+        try
+        {
+            // Security Check: Basic protocol & local check
+            var uri = new Uri(req.PortfolioUrl);
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                throw new Exception("Invalid protocol. Only HTTP/HTTPS allowed.");
+            
+            if (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+                throw new Exception("Verification blocked for localhost.");
+
+            // Fetch with safety limits
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var response = await http.GetAsync(req.PortfolioUrl, cts.Token);
+            response.EnsureSuccessStatusCode();
+
+            // Limit read size to 1MB
+            var html = await response.Content.ReadAsStringAsync(cts.Token);
+            if (html.Length > 1024 * 1024) html = html[..(1024 * 1024)];
+
+            // Patterns to look for
+            var patterns = new[]
+            {
+                "jhersonaguto.dev",
+                $"jhersonaguto.dev/network/{req.PublicSlug}"
+            };
+
+            bool found = false;
+            foreach (var p in patterns)
+            {
+                if (html.Contains(p, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                req.ReciprocalLinkVerified = true;
+                req.ReciprocalLinkVerifiedAt = DateTime.UtcNow;
+                req.ReciprocalLinkCheckError = null;
+            }
+            else
+            {
+                req.ReciprocalLinkVerified = false;
+                req.ReciprocalLinkCheckError = "No matching link found on portfolio page.";
+            }
+        }
+        catch (Exception ex)
+        {
+            req.ReciprocalLinkVerified = false;
+            req.ReciprocalLinkCheckError = $"Verification failed: {ex.Message}";
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SaveEnrichmentAsync(DeveloperProfileEnrichment enrichment)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        var existing = await db.DeveloperProfileEnrichments
+            .FirstOrDefaultAsync(e => e.CollaborationRequestId == enrichment.CollaborationRequestId);
+
+        if (existing == null)
+        {
+            db.DeveloperProfileEnrichments.Add(enrichment);
+        }
+        else
+        {
+            // Update existing record
+            enrichment.Id = existing.Id; // Prevent key modification exception
+            db.Entry(existing).CurrentValues.SetValues(enrichment);
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private async Task EnsurePublicSlugAsync(AppDbContext db, CollaborationRequest req)
+    {
+        if (!string.IsNullOrEmpty(req.PublicSlug)) return;
+
+        var baseSlug = NormalizeSlug($"{req.FirstName}-{req.LastName}");
+        var slug = baseSlug;
+        int counter = 1;
+
+        while (await db.CollaborationRequests.AnyAsync(r => r.PublicSlug == slug && r.Id != req.Id))
+        {
+            counter++;
+            slug = $"{baseSlug}-{counter}";
+        }
+
+        req.PublicSlug = slug;
+    }
+
+    private string NormalizeSlug(string input)
+    {
+        var s = input.ToLowerInvariant().Replace(" ", "-");
+        return System.Text.RegularExpressions.Regex.Replace(s, @"[^a-z0-9\-]", "");
     }
 }
