@@ -96,7 +96,8 @@ public class GeminiService(
                 }
                 catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
-                    logger.LogWarning("Gemini model '{Model}' failed ({StatusCode}). Trying next fallback...", model, ex.StatusCode);
+                    logger.LogWarning("Gemini model '{Model}' failed ({StatusCode}). {Error}", model, ex.StatusCode, ex.Message);
+                    onProgress?.Invoke($"Model {model} failed: {ex.Message}. Trying next...");
                     // Continue to next model
                 }
                 catch (Exception ex)
@@ -340,8 +341,9 @@ public class GeminiService(
         var response = await http.PostAsJsonAsync(url, payload, cts.Token);
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogWarning("Gemini generation request failed for model '{Model}' with status {Status}.", modelName, response.StatusCode);
-            response.EnsureSuccessStatusCode();
+            var errorBody = await response.Content.ReadAsStringAsync(cts.Token);
+            logger.LogWarning("Gemini generation request failed for model '{Model}' with status {Status}. Response: {Body}", modelName, response.StatusCode, errorBody);
+            throw new HttpRequestException($"Gemini API error {response.StatusCode}: {errorBody}", null, response.StatusCode);
         }
 
         var json = await response.Content.ReadAsStringAsync(cts.Token);
