@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject AdminAuthService Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @if (!Auth.IsAuthenticated)
 {
@@ -37,8 +38,9 @@ else
     void ToggleSidebar() => sidebarOpen = !sidebarOpen;
     void CloseSidebar() => sidebarOpen = false;
 
-    void Logout()
+    async Task Logout()
     {
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", "admin_auth_token"); } catch { }
         Auth.Logout();
         Nav.NavigateTo("/admin/login");
     }
