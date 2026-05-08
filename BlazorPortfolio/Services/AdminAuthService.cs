@@ -37,20 +37,46 @@ public class AdminAuthService(IDbContextFactory<AppDbContext> dbFactory)
         return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
-    public async Task<bool> LoginAsync(string username, string password, string key = "unknown")
+    public async Task<bool> TryAutoLoginAsync(string? token)
     {
-        if (IsLockedOut(key)) return false;
+        if (string.IsNullOrEmpty(token)) return false;
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.AdminUsers.FirstOrDefaultAsync(u => u.PersistentToken == token);
+
+        if (user != null && user.PersistentTokenExpiresAt > DateTime.UtcNow)
+        {
+            _isAuthenticated = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<(bool success, string? token)> LoginAsync(string username, string password, bool rememberMe, string key = "unknown")
+    {
+        if (IsLockedOut(key)) return (false, null);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var user = await db.AdminUsers.FirstOrDefaultAsync(u => u.Username == username);
 
         bool success = user is not null && BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
 
-        if (success)
+        if (success && user is not null)
         {
             _attempts.TryRemove(key, out _); // reset on success
             _isAuthenticated = true;
-            return true;
+
+            string? token = null;
+            if (rememberMe)
+            {
+                token = Guid.NewGuid().ToString("N");
+                user.PersistentToken = token;
+                user.PersistentTokenExpiresAt = DateTime.UtcNow.AddDays(30);
+                await db.SaveChangesAsync();
+            }
+
+            return (true, token);
         }
 
         // Record failed attempt
@@ -60,7 +86,7 @@ public class AdminAuthService(IDbContextFactory<AppDbContext> dbFactory)
                 ? (1, DateTime.UtcNow)
                 : (old.Count + 1, old.Window));
 
-        return false;
+        return (false, null);
     }
 
     public void Logout() => _isAuthenticated = false;
