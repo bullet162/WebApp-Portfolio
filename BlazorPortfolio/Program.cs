@@ -115,7 +115,9 @@ app.UseForwardedHeaders(forwardedOptions);
 // Subdomain host-rewriting and security isolation middleware
 app.Use(async (context, next) =>
 {
-    var host = context.Request.Host.Host;
+    // Behind reverse proxies (like Render), the original host requested by the client is sent in the X-Forwarded-Host header.
+    // If not present, we fall back to the standard Request Host.
+    var host = context.Request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? context.Request.Host.Host;
     if (host.Equals("resume.jhersonaguto.dev", StringComparison.OrdinalIgnoreCase))
     {
         var path = context.Request.Path.Value ?? "/";
