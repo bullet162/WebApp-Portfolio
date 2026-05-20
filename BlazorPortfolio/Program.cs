@@ -38,6 +38,17 @@ builder.Services.Configure<BrotliCompressionProviderOptions>(opts =>
 // Server-side memory cache (replaces JS sessionStorage cache)
 builder.Services.AddMemoryCache();
 
+// Register secure CORS policy for our public static resume subdomain
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowResumeSubdomain", policy =>
+    {
+        policy.WithOrigins("https://resume.jhersonaguto.dev", "http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "https://jhersonaguto.dev")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 // Rate limiting — protect admin login from brute force (handled in AdminAuthService)
 builder.Services.AddRateLimiter(opts =>
 {
@@ -112,61 +123,6 @@ forwardedOptions.KnownIPNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
 
-// Subdomain host-rewriting and security isolation middleware
-app.Use(async (context, next) =>
-{
-    // Behind reverse proxies (like Render), the original host requested by the client is sent in the X-Forwarded-Host header.
-    // If not present, we fall back to the standard Request Host.
-    var host = context.Request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? context.Request.Host.Host;
-    var path = context.Request.Path.Value ?? "/";
-
-    if (host.Equals("resume.jhersonaguto.dev", StringComparison.OrdinalIgnoreCase))
-    {
-        // Security requirement: Return 404 for admin pages on resume subdomain
-        if (path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
-        {
-            context.Response.StatusCode = 404;
-            return;
-        }
-
-        // Allow health checks to pass through normally
-        if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
-        {
-            await next();
-            return;
-        }
-
-        // Allow framework assets, WebSocket connection, and static assets to load
-        var isStaticOrFramework = path.Contains('.') || 
-                                  path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) || 
-                                  path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase);
-
-        if (!isStaticOrFramework)
-        {
-            // Internally rewrite all page requests to the public resume page /resume
-            if (path != "/resume")
-            {
-                context.Request.Path = "/resume";
-            }
-        }
-    }
-    else
-    {
-        // Enforce: The resume page is ONLY accessible via the resume.jhersonaguto.dev subdomain.
-        // If a request comes in for /resume on the main domain (e.g. jhersonaguto.dev), we permanently redirect them to the subdomain.
-        // We skip this check on localhost so you can still test it locally!
-        if (path.Equals("/resume", StringComparison.OrdinalIgnoreCase) && 
-            !host.Contains("localhost") && 
-            !host.Contains("127.0.0.1"))
-        {
-            context.Response.Redirect("https://resume.jhersonaguto.dev/", permanent: true);
-            return;
-        }
-    }
-
-    await next();
-});
-
 // Warn on missing required secrets
 var requiredSecrets = new[]
 {
@@ -215,6 +171,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseWebSockets();
+app.UseCors("AllowResumeSubdomain");
 app.UseResponseCompression();
 app.UseRateLimiter();
 app.UseStaticFiles(new StaticFileOptions
@@ -243,6 +200,24 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Dynamic API endpoint for the resume subdomain to fetch the active resume
+app.MapGet("/api/resume/active", async (BlazorPortfolio.Services.ContentService svc) =>
+{
+    var active = await svc.GetActiveResumeAsync();
+    if (active == null) return Results.NotFound();
+
+    // Convert on-the-fly to jsDelivr CDN link format for optimal loading
+    var fileUrl = active.FileUrl;
+    if (fileUrl.Contains("raw.githubusercontent.com"))
+    {
+        fileUrl = fileUrl.Replace("raw.githubusercontent.com/", "cdn.jsdelivr.net/gh/")
+                         .Replace("/main/", "@main/")
+                         .Replace("/master/", "@master/");
+    }
+
+    return Results.Ok(new { fileUrl });
+}).RequireCors("AllowResumeSubdomain");
 
 app.MapGet("/health", () => Results.Ok("OK"));
 
