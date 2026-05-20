@@ -99,7 +99,8 @@ public class GitHubStorageService
 
         _logger.LogInformation("Successfully uploaded resume to GitHub.");
 
-        // Return the raw CDN URL for public embedding & download
-        return $"https://raw.githubusercontent.com/{_owner}/{_repo}/{_branch}/{path}";
+        // Return the globally optimized jsDelivr CDN URL for public embedding & download.
+        // This serves the PDF with correct application/pdf headers so it previews inline in the browser instead of downloading.
+        return $"https://cdn.jsdelivr.net/gh/{_owner}/{_repo}@{_branch}/{path}";
     }
 }
