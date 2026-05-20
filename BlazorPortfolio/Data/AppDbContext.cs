@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CollaborationRequest> CollaborationRequests => Set<CollaborationRequest>();
     public DbSet<DeveloperNetworkProfileRevision> DeveloperNetworkProfileRevisions => Set<DeveloperNetworkProfileRevision>();
     public DbSet<DeveloperProfileEnrichment> DeveloperProfileEnrichments => Set<DeveloperProfileEnrichment>();
+    public DbSet<ResumeFile> ResumeFiles => Set<ResumeFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
