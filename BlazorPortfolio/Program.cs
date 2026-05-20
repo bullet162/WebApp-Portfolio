@@ -78,6 +78,7 @@ builder.Services.AddScoped<ContentService>();
 builder.Services.AddScoped<AdminAuthService>();
 builder.Services.AddScoped<CacheService>();
 builder.Services.AddScoped<GitHubService>();
+builder.Services.AddScoped<GitHubStorageService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<GeminiService>();
 builder.Services.AddHostedService<KeepAliveService>();
@@ -110,6 +111,46 @@ var forwardedOptions = new ForwardedHeadersOptions
 forwardedOptions.KnownIPNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
+
+// Subdomain host-rewriting and security isolation middleware
+app.Use(async (context, next) =>
+{
+    var host = context.Request.Host.Host;
+    if (host.Equals("resume.jhersonaguto.dev", StringComparison.OrdinalIgnoreCase))
+    {
+        var path = context.Request.Path.Value ?? "/";
+
+        // Security requirement: Return 404 for admin pages on resume subdomain
+        if (path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = 404;
+            return;
+        }
+
+        // Allow health checks to pass through normally
+        if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+        {
+            await next();
+            return;
+        }
+
+        // Allow framework assets, WebSocket connection, and static assets to load
+        var isStaticOrFramework = path.Contains('.') || 
+                                  path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) || 
+                                  path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase);
+
+        if (!isStaticOrFramework)
+        {
+            // Internally rewrite all page requests to the public resume page /resume
+            if (path != "/resume")
+            {
+                context.Request.Path = "/resume";
+            }
+        }
+    }
+
+    await next();
+});
 
 // Warn on missing required secrets
 var requiredSecrets = new[]
