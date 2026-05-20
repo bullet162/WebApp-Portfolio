@@ -1,24 +1,32 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Nav
 
-<header class="site-header" id="site-header">
-    <div class="container header-inner">
-        <a href="/" class="brand">
-            <span class="brand-dot"></span>Jherson Aguto
-        </a>
-        <button class="nav-toggle" @onclick="ToggleMenu" aria-label="Toggle navigation" aria-expanded="@menuOpen">
-            <span></span><span></span><span></span>
-        </button>
-        <nav class="header-nav @(menuOpen ? "nav-open" : "")">
-            <a href="/#about" @onclick="CloseMenu">About</a>
-            <a href="/#experience" @onclick="CloseMenu">Experience</a>
-            <a href="/#skills" @onclick="CloseMenu">Skills</a>
-            <a href="/#projects" @onclick="CloseMenu">Projects</a>
-            <a href="/#github" @onclick="CloseMenu">GitHub</a>
-            <a href="/network" @onclick="CloseMenu">Network</a>
-            <a href="/#contact" class="nav-cta" @onclick="CloseMenu">Contact</a>
-        </nav>
-    </div>
-</header>
+@{
+    var isResumePage = Nav.ToBaseRelativePath(Nav.Uri).StartsWith("resume", StringComparison.OrdinalIgnoreCase);
+}
+
+@if (!isResumePage)
+{
+    <header class="site-header" id="site-header">
+        <div class="container header-inner">
+            <a href="/" class="brand">
+                <span class="brand-dot"></span>Jherson Aguto
+            </a>
+            <button class="nav-toggle" @onclick="ToggleMenu" aria-label="Toggle navigation" aria-expanded="@menuOpen">
+                <span></span><span></span><span></span>
+            </button>
+            <nav class="header-nav @(menuOpen ? "nav-open" : "")">
+                <a href="/#about" @onclick="CloseMenu">About</a>
+                <a href="/#experience" @onclick="CloseMenu">Experience</a>
+                <a href="/#skills" @onclick="CloseMenu">Skills</a>
+                <a href="/#projects" @onclick="CloseMenu">Projects</a>
+                <a href="/#github" @onclick="CloseMenu">GitHub</a>
+                <a href="/network" @onclick="CloseMenu">Network</a>
+                <a href="/#contact" class="nav-cta" @onclick="CloseMenu">Contact</a>
+            </nav>
+        </div>
+    </header>
+}
 
 <main>
     @Body
