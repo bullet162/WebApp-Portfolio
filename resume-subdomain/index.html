@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jherson Aguto | Professional Resume</title>
+    
+    <!-- SEO and Social Previews -->
+    <meta name="description" content="View the professional resume of Jherson Aguto, Full Stack Developer specializing in .NET Core, Blazor, and high-performance backend systems.">
+    <meta property="og:title" content="Jherson Aguto | Professional Resume">
+    <meta property="og:description" content="View the professional resume of Jherson Aguto, Full Stack Developer.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:title" content="Jherson Aguto | Professional Resume">
+    <meta name="twitter:description" content="View the professional resume of Jherson Aguto, Full Stack Developer.">
+    
+    <!-- Fonts & Stylesheet -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Premium Glassmorphic Header -->
+    <header class="resume-header">
+        <div class="brand-info">
+            <h1 class="brand-title">Jherson Aguto</h1>
+            <p class="brand-subtitle">Full Stack Developer & Software Engineer</p>
+        </div>
+        <div class="header-actions">
+            <a href="https://jhersonaguto.dev" class="btn btn-portfolio" id="portfolio-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Portfolio
+            </a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-download" id="download-btn" style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download PDF
+            </a>
+        </div>
+    </header>
+
+    <!-- Viewer Space -->
+    <main class="resume-content">
+        <div class="viewer-card">
+            
+            <!-- Loading Spinner State -->
+            <div class="loading-state" id="loading-state">
+                <div class="spinner"></div>
+                <p>Retrieving latest resume...</p>
+            </div>
+
+            <!-- Error State (hidden by default) -->
+            <div class="error-state" id="error-state" style="display: none; padding: 2rem; text-align: center;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1rem;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <h3 style="color: #f3f4f6; margin-bottom: 0.5rem; font-size: 1.25rem;">Failed to Load Resume</h3>
+                <p id="error-message" style="font-size: 0.9rem; max-width: 320px; line-height: 1.5;">No active resume is available at this moment. Please check back later.</p>
+            </div>
+
+            <!-- Iframe Container -->
+            <div class="iframe-container" id="iframe-container" style="display: none;">
+                <iframe id="resume-viewer" title="Jherson Aguto Resume Viewer" scrolling="no"></iframe>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Dynamic Fetch Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loadingState = document.getElementById('loading-state');
+            const errorState = document.getElementById('error-state');
+            const errorMessage = document.getElementById('error-message');
+            const iframeContainer = document.getElementById('iframe-container');
+            const viewer = document.getElementById('resume-viewer');
+            const downloadBtn = document.getElementById('download-btn');
+            const portfolioBtn = document.getElementById('portfolio-btn');
+
+            // Detect if running locally to use local ports, otherwise call production API
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiEndpoints = isLocal 
+                ? ['https://localhost:7275/api/resume/active', 'http://localhost:5297/api/resume/active']
+                : ['https://jhersonaguto.dev/api/resume/active'];
+
+            // Adjust portfolio back-link for local environment
+            if (isLocal) {
+                portfolioBtn.href = 'http://localhost:5297';
+            }
+
+            let fileUrl = null;
+            let lastError = null;
+
+            // Try loading from endpoints sequentially (handles local HTTPS vs HTTP automatically)
+            for (const url of apiEndpoints) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.fileUrl) {
+                            fileUrl = data.fileUrl;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`Could not fetch from endpoint: ${url}`, e);
+                }
+            }
+
+            // Display loading result
+            if (fileUrl) {
+                // Remove toolbar controls, disable scrollbars, and scale full page fit exactly
+                const displayUrl = `${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`;
+                
+                viewer.src = displayUrl;
+                downloadBtn.href = fileUrl;
+                downloadBtn.style.display = 'inline-flex';
+
+                // Let the iframe render before hiding the spinner for ultra-smooth transition
+                viewer.onload = () => {
+                    loadingState.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingState.style.display = 'none';
+                        iframeContainer.style.display = 'block';
+                    }, 300);
+                };
+            } else {
+                loadingState.style.display = 'none';
+                errorState.style.display = 'flex';
+                if (isLocal) {
+                    errorMessage.textContent = 'Please make sure your Blazor Portfolio app is running locally (e.g. at https://localhost:7275 or http://localhost:5297) so this page can connect to your local API!';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
