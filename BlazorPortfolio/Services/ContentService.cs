@@ -6,7 +6,13 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace BlazorPortfolio.Services;
 
-public class ContentService(IDbContextFactory<AppDbContext> factory, EmailService email, HttpClient http, IMemoryCache cache)
+public class ContentService(
+    IDbContextFactory<AppDbContext> factory, 
+    EmailService email, 
+    HttpClient http, 
+    IMemoryCache cache,
+    AdminAuthService auth,
+    GitHubStorageService githubStorage)
 {
     // ── Experiences ──────────────────────────────────────────────────────────
     public async Task<List<Experience>> GetExperiencesAsync()
@@ -444,5 +450,165 @@ public class ContentService(IDbContextFactory<AppDbContext> factory, EmailServic
     {
         var s = input.ToLowerInvariant().Replace(" ", "-");
         return System.Text.RegularExpressions.Regex.Replace(s, @"[^a-z0-9\-]", "");
+    }
+
+    // ── Resumes ─────────────────────────────────────────────────────────────
+    public async Task<ResumeFile?> GetActiveResumeAsync()
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.ResumeFiles.FirstOrDefaultAsync(r => r.IsActive);
+    }
+
+    public async Task<List<ResumeFile>> GetAllResumesAsync()
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.ResumeFiles.OrderByDescending(r => r.UploadedAt).ToListAsync();
+    }
+
+    public async Task SaveResumeFileAsync(ResumeFile file)
+    {
+        if (!auth.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException("Administrator authentication is required to perform this action.");
+        }
+
+        await using var db = await factory.CreateDbContextAsync();
+        
+        if (file.IsActive)
+        {
+            // Deactivate all other resumes
+            await db.ResumeFiles
+                .Where(r => r.IsActive)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsActive, false));
+        }
+
+        if (file.Id == 0)
+        {
+            db.ResumeFiles.Add(file);
+        }
+        else
+        {
+            file.UpdatedAt = DateTime.UtcNow;
+            db.ResumeFiles.Update(file);
+        }
+
+        await db.SaveChangesAsync();
+
+        // Ensure SiteProfile points to "/resume"
+        var profile = await db.SiteProfiles.FirstOrDefaultAsync();
+        if (profile != null)
+        {
+            profile.ResumeUrl = "/resume";
+            db.SiteProfiles.Update(profile);
+            await db.SaveChangesAsync();
+            cache.Remove(CacheService.Keys.Profile);
+        }
+    }
+
+    public async Task SetActiveResumeAsync(int id)
+    {
+        if (!auth.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException("Administrator authentication is required to perform this action.");
+        }
+
+        await using var db = await factory.CreateDbContextAsync();
+
+        // Deactivate all resumes
+        await db.ResumeFiles
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsActive, false));
+
+        // Activate selected
+        await db.ResumeFiles
+            .Where(r => r.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.IsActive, true));
+
+        // Ensure SiteProfile points to "/resume"
+        var profile = await db.SiteProfiles.FirstOrDefaultAsync();
+        if (profile != null)
+        {
+            profile.ResumeUrl = "/resume";
+            db.SiteProfiles.Update(profile);
+            await db.SaveChangesAsync();
+            cache.Remove(CacheService.Keys.Profile);
+        }
+    }
+
+    public async Task DeleteResumeAsync(int id)
+    {
+        if (!auth.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException("Administrator authentication is required to perform this action.");
+        }
+
+        await using var db = await factory.CreateDbContextAsync();
+        var file = await db.ResumeFiles.FindAsync(id);
+        if (file == null) return;
+
+        db.ResumeFiles.Remove(file);
+        await db.SaveChangesAsync();
+
+        if (file.IsActive)
+        {
+            var activeExists = await db.ResumeFiles.AnyAsync(r => r.IsActive);
+            if (!activeExists)
+            {
+                var profile = await db.SiteProfiles.FirstOrDefaultAsync();
+                if (profile != null)
+                {
+                    profile.ResumeUrl = null;
+                    db.SiteProfiles.Update(profile);
+                    await db.SaveChangesAsync();
+                    cache.Remove(CacheService.Keys.Profile);
+                }
+            }
+        }
+    }
+
+    public async Task<ResumeFile> UploadAndSaveResumeAsync(byte[] fileBytes, string originalFileName)
+    {
+        if (!auth.IsAuthenticated)
+        {
+            throw new UnauthorizedAccessException("Administrator authentication is required to perform this action.");
+        }
+
+        if (fileBytes == null || fileBytes.Length == 0)
+        {
+            throw new ArgumentException("Uploaded file cannot be empty.");
+        }
+
+        if (fileBytes.Length > 5 * 1024 * 1024)
+        {
+            throw new ArgumentException("File size exceeds the 5 MB limit.");
+        }
+
+        // Generate safe versioned filename: resume-YYYY-MM-DD-guid.pdf
+        var dateStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var guidStr = Guid.NewGuid().ToString("N").Substring(0, 8);
+        var safeFileName = $"resume-{dateStr}-{guidStr}.pdf";
+
+        // Upload to GitHub via GitHubStorageService
+        var fileUrl = await githubStorage.UploadResumeAsync(fileBytes, safeFileName);
+
+        // Build storage key path (relative to repo path)
+        var relativePath = $"{githubStorage.BasePath?.Trim('/') ?? "public-assets/resume"}/{safeFileName}";
+
+        var resumeFile = new ResumeFile
+        {
+            OriginalFileName = originalFileName,
+            StoredFileName = safeFileName,
+            FileUrl = fileUrl,
+            StorageKey = relativePath,
+            ContentType = "application/pdf",
+            FileSizeBytes = fileBytes.Length,
+            IsActive = true, // mark as active by default on upload
+            UploadedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Save metadata and deactivate previous active ones
+        await SaveResumeFileAsync(resumeFile);
+
+        return resumeFile;
     }
 }
