@@ -51,7 +51,7 @@
                 </div>
                 
                 <div class="iframe-container">
-                    <iframe src="@($"{_activeResume.FileUrl}#toolbar=1&navpanes=0&scrollbar=1")" 
+                    <iframe src="@($"{_activeResume.FileUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH")" 
                             type="application/pdf"
                             title="Jherson Aguto Resume Viewer"
                             frameborder="0">
@@ -76,7 +76,16 @@
 </div>
 
 <style>
-        .resume-page-container {
+    /* Reset all parent wrappers to fit exactly one screen height without scrollbars */
+    html, body, main {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    .resume-page-container {
             height: 100dvh;
             max-height: 100dvh;
             overflow: hidden;
