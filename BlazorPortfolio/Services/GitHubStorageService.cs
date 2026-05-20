@@ -30,9 +30,10 @@ public class GitHubStorageService
         _branch = _config["GitHubStorage:Branch"] ?? "main";
         _basePath = _config["GitHubStorage:BasePath"] ?? "public-assets/resume";
 
-        // Read token from environment variables, secure settings, or fallback to general GitHub:Token config
+        // Read token from environment variables, secure settings, or fallback to general GitHub config
         _token = Environment.GetEnvironmentVariable("GITHUB_STORAGE_TOKEN") 
                  ?? _config["GITHUB_STORAGE_TOKEN"] 
+                 ?? _config["GitHub:Resume"]
                  ?? _config["GitHub:Token"];
     }
 
