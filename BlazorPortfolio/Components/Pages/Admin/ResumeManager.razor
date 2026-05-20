@@ -1,0 +1,454 @@
+@page "/admin/resume"
+@layout AdminLayout
+@rendermode InteractiveServer
+@inject ContentService Svc
+@inject GitHubStorageService StorageService
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Resume Manager</PageTitle>
+
+<h1>Resume Manager</h1>
+
+<div class="edit-form" style="max-width:900px">
+    <h3>Upload New Resume</h3>
+
+    @if (!StorageService.IsConfigured)
+    {
+        <div class="alert-error" style="margin-bottom:1.5rem">
+            ⚠️ <strong>GitHub Storage is not configured!</strong>
+            <p style="margin:0.5rem 0 0 0;font-size:0.9rem">
+                Please set the <strong>GITHUB_STORAGE_TOKEN</strong> environment variable and configure the <strong>GitHubStorage</strong> section in your deployment or secrets configuration.
+            </p>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_successMsg))
+    {
+        <div class="alert-success" style="margin-bottom:1.5rem">
+            <span class="alert-icon">✅</span>
+            <div><strong>@_successMsg</strong></div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMsg))
+    {
+        <div class="alert-error" style="margin-bottom:1.5rem">
+            ⚠️ @_errorMsg
+        </div>
+    }
+
+    <div class="form-group">
+        <label>Select Resume PDF (Max 5MB) *</label>
+        <InputFile OnChange="OnInputFileChange" class="form-control" accept=".pdf" disabled="@(!StorageService.IsConfigured || _isUploading)" />
+        <small style="color:var(--text-muted);display:block;margin-top:0.25rem">Only standard PDF files (.pdf) are accepted.</small>
+    </div>
+
+    <div style="margin-top:1rem">
+        @if (_isUploading)
+        {
+            <button type="button" class="btn-primary" disabled>
+                <span class="spinner-small"></span> Uploading...
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn-primary" @onclick="HandleUpload" disabled="@(_selectedFile == null || !StorageService.IsConfigured)">
+                Upload to GitHub
+            </button>
+        }
+    </div>
+</div>
+
+<div class="edit-form" style="max-width:900px;margin-top:2rem">
+    <h3>Current Active Resume</h3>
+    @if (_activeResume != null)
+    {
+        <div class="active-resume-card">
+            <div class="resume-meta-grid">
+                <div>
+                    <strong>Original Filename:</strong>
+                    <span>@_activeResume.OriginalFileName</span>
+                </div>
+                <div>
+                    <strong>Stored Name:</strong>
+                    <span>@_activeResume.StoredFileName</span>
+                </div>
+                <div>
+                    <strong>File Size:</strong>
+                    <span>@FormatSize(_activeResume.FileSizeBytes)</span>
+                </div>
+                <div>
+                    <strong>Uploaded At:</strong>
+                    <span>@_activeResume.UploadedAt.ToLocalTime().ToString("g")</span>
+                </div>
+            </div>
+            <div style="margin-top:1.5rem">
+                <a href="@_activeResume.FileUrl" target="_blank" rel="noopener noreferrer" class="btn-secondary">
+                    🔗 View Active PDF
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p style="color:var(--text-muted);font-style:italic">No resume is currently active. Visitors will see the empty state placeholder on the public site.</p>
+    }
+</div>
+
+<div class="edit-form" style="max-width:900px;margin-top:2rem;margin-bottom:2rem">
+    <h3>Resume History</h3>
+    @if (_resumes == null)
+    {
+        <p>Loading history...</p>
+    }
+    else if (_resumes.Count == 0)
+    {
+        <p style="color:var(--text-muted)">No upload history available.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Original Name</th>
+                        <th>Upload Date</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var res in _resumes)
+                    {
+                        <tr>
+                            <td>
+                                <a href="@res.FileUrl" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:underline">
+                                    @res.OriginalFileName
+                                </a>
+                            </td>
+                            <td>@res.UploadedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@FormatSize(res.FileSizeBytes)</td>
+                            <td>
+                                @if (res.IsActive)
+                                {
+                                    <span class="badge badge-active">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-inactive">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    @if (!res.IsActive)
+                                    {
+                                        <button type="button" class="btn-action-primary" @onclick="() => SetActive(res.Id)">
+                                            Activate
+                                        </button>
+                                    }
+                                    <button type="button" class="btn-action-danger" @onclick="() => Delete(res.Id)">
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<style>
+    .active-resume-card {
+        background-color: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+
+    .resume-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .resume-meta-grid div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .resume-meta-grid strong {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .resume-meta-grid span {
+        font-size: 0.95rem;
+        word-break: break-all;
+    }
+
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .admin-table th, .admin-table td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .admin-table th {
+        background-color: rgba(255, 255, 255, 0.02);
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .badge-active {
+        background-color: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-inactive {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-action-primary, .btn-action-danger {
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-action-primary {
+        background-color: rgba(79, 70, 229, 0.1);
+        color: #818cf8;
+        border: 1px solid rgba(79, 70, 229, 0.2);
+    }
+
+    .btn-action-primary:hover {
+        background-color: #4f46e5;
+        color: white;
+        border-color: #4f46e5;
+    }
+
+    .btn-action-danger {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-action-danger:hover {
+        background-color: #ef4444;
+        color: white;
+        border-color: #ef4444;
+    }
+
+    .spinner-small {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s infinite linear;
+        margin-right: 0.25rem;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private List<ResumeFile>? _resumes;
+    private ResumeFile? _activeResume;
+    
+    private IBrowserFile? _selectedFile;
+    private bool _isUploading = false;
+    
+    private string? _successMsg;
+    private string? _errorMsg;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Enforce administrative authentication redirect if needed
+        if (!Auth.IsAuthenticated)
+        {
+            Nav.NavigateTo("/admin/login");
+            return;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _resumes = await Svc.GetAllResumesAsync();
+        _activeResume = await Svc.GetActiveResumeAsync();
+    }
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        _successMsg = null;
+        _errorMsg = null;
+        _selectedFile = e.File;
+
+        if (_selectedFile != null)
+        {
+            // Enforce PDF validation
+            if (!_selectedFile.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                _errorMsg = "Invalid file type. Only PDF (.pdf) files are supported.";
+                _selectedFile = null;
+                return;
+            }
+
+            if (_selectedFile.Size == 0)
+            {
+                _errorMsg = "The selected file is empty.";
+                _selectedFile = null;
+                return;
+            }
+
+            // Enforce 5MB limit
+            if (_selectedFile.Size > 5 * 1024 * 1024)
+            {
+                _errorMsg = "File size exceeds the 5MB maximum limit.";
+                _selectedFile = null;
+                return;
+            }
+        }
+    }
+
+    private async Task HandleUpload()
+    {
+        if (_selectedFile == null) return;
+        
+        _successMsg = null;
+        _errorMsg = null;
+        _isUploading = true;
+
+        try
+        {
+            // Re-validate Admin status on the server before starting upload
+            if (!Auth.IsAuthenticated)
+            {
+                throw new UnauthorizedAccessException("Session expired. Please log in again.");
+            }
+
+            // Read the file bytes
+            using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var buffer = new byte[_selectedFile.Size];
+            int totalRead = 0;
+            while (totalRead < _selectedFile.Size)
+            {
+                int read = await stream.ReadAsync(buffer, totalRead, (int)_selectedFile.Size - totalRead);
+                if (read == 0) break;
+                totalRead += read;
+            }
+
+            // Call server service logic to upload to GitHub and write PostgreSQL metadata
+            await Svc.UploadAndSaveResumeAsync(buffer, _selectedFile.Name);
+
+            _successMsg = "Resume successfully uploaded to GitHub and marked as active!";
+            _selectedFile = null;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMsg = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _isUploading = false;
+        }
+    }
+
+    private async Task SetActive(int id)
+    {
+        _successMsg = null;
+        _errorMsg = null;
+
+        try
+        {
+            // Re-validate on the server
+            if (!Auth.IsAuthenticated)
+            {
+                throw new UnauthorizedAccessException("Session expired.");
+            }
+
+            await Svc.SetActiveResumeAsync(id);
+            _successMsg = "Selected resume is now active.";
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMsg = $"Failed to set active: {ex.Message}";
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        _successMsg = null;
+        _errorMsg = null;
+
+        try
+        {
+            // Re-validate on the server
+            if (!Auth.IsAuthenticated)
+            {
+                throw new UnauthorizedAccessException("Session expired.");
+            }
+
+            await Svc.DeleteResumeAsync(id);
+            _successMsg = "Resume successfully deleted.";
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMsg = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private string FormatSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+        {
+            return $"{(double)bytes / (1024 * 1024):F2} MB";
+        }
+        return $"{(double)bytes / 1024:F2} KB";
+    }
+}
