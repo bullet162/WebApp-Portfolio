@@ -325,6 +325,15 @@
         try
         {
             _activeResume = await Svc.GetActiveResumeAsync();
+            if (_activeResume != null && _activeResume.FileUrl.Contains("raw.githubusercontent.com"))
+            {
+                // Convert raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+                // to cdn.jsdelivr.net/gh/{owner}/{repo}@{branch}/{path}
+                _activeResume.FileUrl = _activeResume.FileUrl
+                    .Replace("raw.githubusercontent.com/", "cdn.jsdelivr.net/gh/")
+                    .Replace("/main/", "@main/")
+                    .Replace("/master/", "@master/");
+            }
         }
         catch (Exception)
         {
