@@ -118,10 +118,10 @@ app.Use(async (context, next) =>
     // Behind reverse proxies (like Render), the original host requested by the client is sent in the X-Forwarded-Host header.
     // If not present, we fall back to the standard Request Host.
     var host = context.Request.Headers["X-Forwarded-Host"].FirstOrDefault() ?? context.Request.Host.Host;
+    var path = context.Request.Path.Value ?? "/";
+
     if (host.Equals("resume.jhersonaguto.dev", StringComparison.OrdinalIgnoreCase))
     {
-        var path = context.Request.Path.Value ?? "/";
-
         // Security requirement: Return 404 for admin pages on resume subdomain
         if (path.StartsWith("/admin", StringComparison.OrdinalIgnoreCase))
         {
@@ -148,6 +148,19 @@ app.Use(async (context, next) =>
             {
                 context.Request.Path = "/resume";
             }
+        }
+    }
+    else
+    {
+        // Enforce: The resume page is ONLY accessible via the resume.jhersonaguto.dev subdomain.
+        // If a request comes in for /resume on the main domain (e.g. jhersonaguto.dev), we permanently redirect them to the subdomain.
+        // We skip this check on localhost so you can still test it locally!
+        if (path.Equals("/resume", StringComparison.OrdinalIgnoreCase) && 
+            !host.Contains("localhost") && 
+            !host.Contains("127.0.0.1"))
+        {
+            context.Response.Redirect("https://resume.jhersonaguto.dev/", permanent: true);
+            return;
         }
     }
 
