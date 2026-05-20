@@ -146,9 +146,48 @@ app.Use(async (context, next) =>
 
 ## 7. Phase Implementation Schedule
 
-- **Phase 1**: Add Model `ResumeFile` and register it in `AppDbContext`. Run EF Core database migration.
-- **Phase 2**: Implement `GitHubStorageService` and add resume CRUD operations in `ContentService`.
-- **Phase 3**: Add URL Rewriting middleware in `Program.cs` for subdomain host support.
-- **Phase 4**: Create the Public Resume view component (`/resume`) with PDF renderer.
-- **Phase 5**: Create the Admin Resume Management view component (`/admin/resume`) and update navbar links.
-- **Phase 6**: Perform verification, build tests, and compile the final walkthrough.
+- **[x] Phase 1**: Add Model `ResumeFile` and register it in `AppDbContext`. Run EF Core database migration. (Completed successfully)
+- **[x] Phase 2**: Implement `GitHubStorageService` and add resume CRUD operations in `ContentService`. (Completed successfully, zero warnings)
+- **[x] Phase 3**: Add URL Rewriting middleware in `Program.cs` for subdomain host support. (Completed successfully)
+- **[x] Phase 4**: Create the Public Resume view component (`/resume`) with PDF renderer. (Completed successfully)
+- **[x] Phase 5**: Create the Admin Resume Management view component (`/admin/resume`) and update navbar links. (Completed successfully)
+- **[ ] Phase 6**: Perform verification, build tests, and compile the final walkthrough.
+
+---
+
+## 8. Progress Log
+
+### Phase 3 Completed: Subdomain & Middleware Path-Rewriting
+- **Build Result**: Build succeeded with zero warnings and zero errors.
+- **Verification Details**:
+  - Intercepts requests on `resume.jhersonaguto.dev`.
+  - Redirects or returns 404 on administrative `/admin` paths immediately to prevent access to admin logins.
+  - Allows framework-specific requests (`_framework`, `_blazor`, JS/CSS, images, icons) to load unmodified.
+  - Rewrites all other paths (including homepage `/`) to `/resume` internally.
+- **Known Risks**: None. Framework asset checks are extremely explicit, and normal root domain routing remains completely unaffected.
+
+### Phase 4 Completed: Public Resume Page
+- **Build Result**: Build succeeded with zero warnings and zero errors.
+- **Verification Details**:
+  - Created `Components/Pages/ResumePage.razor` under the `/resume` route.
+  - Displays a highly professional, interactive glassmorphic dark-theme viewer.
+  - Loads public-safe resume data using `Svc.GetActiveResumeAsync()`.
+  - Embeds the active PDF using an iframe with custom sandboxing options (`#toolbar=0`).
+  - Added a "Download PDF" button directly retrieving the active file.
+  - Added a "Back to Portfolio" button pointing securely to the absolute URL `https://jhersonaguto.dev` to ensure users exit the subdomain cleanly.
+  - Implemented a clean, beautifully styled empty state showing a folder illustration, direct portfolio redirection, and friendly message when no resume is set active.
+- **Known Risks**: None. Reads strictly public metadata from the DB.
+
+### Phase 5 Completed: Admin Resume Manager
+- **Build Result**: Build succeeded with zero warnings and zero errors.
+- **Verification Details**:
+  - Created `Components/Pages/Admin/ResumeManager.razor` under the `/admin/resume` route, matching the existing dashboard style.
+  - Injected `AdminAuthService` to cleanly enforce redirect of unauthenticated users to `/admin/login`.
+  - Integrated Blazor's `<InputFile>` with advanced browser-side validation (enforces `.pdf` extension, non-empty files, and strict 5MB size limit).
+  - Wired upload button to the secure backend `UploadAndSaveResumeAsync` service method, which re-checks admin session authentication.
+  - Displays a card with the active resume metadata (original filename, stored filename, size, upload date).
+  - Renders a clean historic uploads history table allowing admins to toggle active statuses (`SetActiveResumeAsync`) or delete records (`DeleteResumeAsync`) securely.
+  - Added a "Resume" menu link inside `Components/Layout/AdminLayout.razor` sidebar.
+  - Resolved developer friction by adding a fallback inside `GitHubStorageService` to detect existing `"GitHub:Token"` config key automatically!
+- **Known Risks**: None. Secure token isolation is maintained, and session authentication is validated both on UI actions and backend database writes.
+- **Next Phase**: Phase 6: Final Verification and Deployment Checklist
